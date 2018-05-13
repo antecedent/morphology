@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style type="text/css">
+        .tasks li {
+            color: gray;
+        }
+
+        .tasks li.completed {
+            color: green;
+        }
+
+        .tasks li.initiated, .tasks li.progress {
+            color: black;
+        }
+
+        .tasks li.failed {
+            color: crimson;
+        }
+
+        canvas {
+            display: block;
+            margin: 0 auto;
+        }
+    </style>
+    <script
+      src="https://code.jquery.com/jquery-3.3.1.min.js"
+      integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+      crossorigin="anonymous"></script>
+    <script src="visualization.js"></script>
+    <script>
+        $(() => {
+            var vertexRadius = 7;
+            var canvasSize = $(window).height() - 50;
+            var canvas = $(Visualization.createHiDPICanvas(canvasSize, canvasSize)).appendTo($('body')).hide()[0];
+            var currentCluster = 0;
+            var results = {};
+
+            $('.texts a').click(function () {
+                $('.texts-section, .parameters-section').hide();
+                $.get($(this).data('src'), (text) => {
+                    var worker = new Worker('worker.js');
+                    $('.tasks li').removeClass();
+                    $('.progress').text('0');
+                    worker.onmessage = (e) => {
+                        var element = $('.tasks li[data-task=?]'.replace('?', e.data.task));
+                        element.removeClass().addClass(e.data.state);
+                        if (e.data.state == 'progress') {
+                            element.find('.progress').text(e.data.progress);
+                        }
+                        if (e.data.state == 'completed') {
+                            element.find('.progress').text('100');
+                            results[e.data.task] = e.data.result;
+                            if (e.data.task == 'getRelevantEdges') {
+                                $(':not(canvas, :has(canvas))').hide();
+                                $('canvas').show();
+                                window.setInterval(() => {
+                                    Visualization.drawClusterRelations(
+                                        currentCluster,
+                                        results.renumberClusters[0],
+                                        results.getAdjacencyMatrix[1],
+                                        results.getRelevantEdges,
+                                        results.generateLayout,
+                                        canvas,
+                                        vertexRadius
+                                    );
+                                    currentCluster = (currentCluster + 1) % results.renumberClusters[1];
+                                }, 1000);
+                            }
+                        }
+                        if (e.data.state == 'failed') {
+                            worker.terminate();
+                            console.log(e.data.stack);
+                        }
+                    };
+                    var parameters = {};
+                    $('.parameters-section input').each(function () {
+                        parameters[$(this).data('key')] = parseInt($(this).val());
+                    });
+                    worker.postMessage({
+                        text: text,
+                        vertexRadius: vertexRadius,
+                        canvasWidth: canvasSize,
+                        canvasHeight: canvasSize,
+                        parameters: parameters
+                    });
+                });
+                return false;
+            });
+        });
+    </script>
+</head>
+<body>
+    <h1>Savarankiška (<em>unsupervised</em>) <abbr title="šaknų, priesagų, priešdėlių, galūnių">morfemų</abbr> paieška tekste</h1>
+    <p>&copy; 2018 Ignas Rudaitis</p>
+    <section class="texts-section">
+        <h2>Pasirinkite tekstą</h2>
+        <p>Tekstai imami iš <a href="https://www.gutenberg.org/"><em>Project Gutenberg</em></a> ir <a href="http://www.antologija.lt/"><em>Antologija.lt</em></a>.</p>
+        <dl>
+            <dt>Anglų kalba</dt>
+            <dd>
+                <ul class="texts">
+                    <li><a href="#" data-src="pg730.txt">Charles Dickens. <em>Oliver Twist</em></a></li>
+                </ul>
+            </dd>
+
+            <dt>Ispanų kalba</dt>
+            <dd>
+                <ul class="texts">
+                    <li><a href="#" data-src="54436-0.txt">Pedro Calderón de la Barca. <em>Teatro selecto, tomo 1 de 4</em></a></li>
+                </ul>
+            </dd>
+
+            <dt>Lietuvių kalba</dt>
+            <dd>
+                <ul class="texts">
+                    <li><a href="#" data-src="lt.txt">Vincas Mykolaitis-Putinas. <em>Altorių šešėly</em> (ištrauka)</a></li>
+                </ul>
+            </dd>
+
+            <dt>Rusų kalba</dt>
+            <dd>
+                <ul class="texts">
+                    <li><a href="#" data-src="14741-0.txt">Гавриил Романович Державин. <em>Духовные оды</em></a></li>
+                </ul>
+            </dd>
+        </dl>
+    </section>
+    <section class="parameters-section">
+        <h2>Parametrai</h2>
+        <table>
+            <tr>
+                <td>Kaimynysčių įtraukties koeficientas</td>
+                <td><input type="number" data-key="edgeThresholdFactor" value="5"></td>
+            </tr>
+            <tr>
+                <td>Idealus morfemos ilgis</td>
+                <td><input type="number" data-key="preferredMorphemeLength" value="3"></td>
+            </tr>
+            <tr>
+                <td>Įsimintinų raidžių samplaikų skaičius</td>
+                <td><input type="number" data-key="numSalientSubstrings" value="100"></td>
+            </tr>
+            <tr>
+                <td>Minimalus komutaciją įrodančių žodžių skaičius</td>
+                <td><input type="number" data-key="minCommutationStrength" value="10"></td>
+            </tr>
+            <tr>
+                <td>Minimalus reikšmingos bigramos dažnis</td>
+                <td><input type="number" data-key="minEdgeStrength" value="10"></td>
+            </tr>
+            <tr>
+                <td>Pirmojo grupavimo grupių skaičius</td>
+                <td><input type="number" data-key="firstPassClusterCount" value="70"></td>
+            </tr>
+            <tr>
+                <td>Antrojo grupavimo grupių skaičius</td>
+                <td><input type="number" data-key="secondPassClusterCount" value="35"></td>
+            </tr>
+        </table>
+    </section>
+    <h2>Eiga</h2>
+    <ul class="tasks">
+        <li data-task="extractWords">Išrinkti žodžius</li>
+        <li data-task="addBoundaryChars">Sudėti ribų ženklus</li>
+        <li data-task="getSalientSubstrings">Rasti dažnai pasikartojančias raidžių samplaikas</li>
+        <li data-task="commute">Atlikti komutacijų testus (<span class="progress">0</span>%)</li>
+        <li data-task="refineCommutations">Patikslinti komutacijų testų rezultatus (<span class="progress">0</span>%)</li>
+        <li data-task="getBigrams">Sužymėti galimų morfemų kaimynystę</li>
+        <li data-task="getMorphemes">Paskelbti kandidatines morfemas</li>
+        <li data-task="getAdjacencyMatrix">Sudaryti kaimynystės matricą</li>
+        <li data-task="doFirstPassClustering">Sugrupuoti morfemas su panašiomis kaimynystės savybėmis</li>
+        <li data-task="doSecondPassClustering">Patikslinti morfemų grupavimą</li>
+        <li data-task="renumberClusters">Atnaujinti grupių numeraciją</li>
+        <li data-task="generateLayout">Išdėstyti kaimynystės schemą plokštumoje (<span class="progress">0</span>%)</li>
+        <li data-task="getRelevantEdges">Išrinkti rodykles iš kaimynystės matricos (<span class="progress">0</span>%)</li>
+    </ul>
+</body>
+</html>
