@@ -27,6 +27,9 @@ $(() => {
                 numClusters = Math.max(numClusters, c + 1);
             }
             for (var [i, j] of edges) {
+                if (layout[i] == null || layout[j] == null) {
+                    continue;
+                }
                 var color;
                 if (clusters[i] == cluster) {
                     color = 'rgba(0, 155, 255, 0.5)';
@@ -58,6 +61,9 @@ $(() => {
             }
             for (var m of Object.keys(morphemeMapping)) {
                 var i = morphemeMapping[m];
+                if (layout[i] == null) {
+                    continue;
+                }
                 var hue = parseInt(330 * clusters[i] / numClusters);
                 ctx.fillStyle = 'hsl(' + hue + ', 100%, 50%)';
                 ctx.beginPath();
@@ -66,6 +72,9 @@ $(() => {
             }
             for (var m of Object.keys(morphemeMapping)) {
                 var i = morphemeMapping[m];
+                if (layout[i] == null) {
+                    continue;
+                }
                 ctx.font = '9px \'Segoe UI\', Helvetica, Arial, sans-serif';
                 ctx.fillStyle = 'black';
                 ctx.textAlign = 'center';

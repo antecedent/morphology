@@ -4,12 +4,13 @@ Morphology = {
     preferredMorphemeLength: 3,
     numSalientSubstrings: 1000,
     minCommutationStrength: 10,
-    minEdgeStrength: 10,
+    minEdgeStrength: 1,
     firstPassSquashingFactor: 50,
     firstPassClusterCount: 70,
     secondPassSquashingFactor: 150,
     secondPassClusterCount: 35,
     edgeThresholdFactor: 5,
+    pruningThreshold: 2000,
 
     extractWords: (text) => {
         var words = new Set;
@@ -217,23 +218,31 @@ Morphology = {
                 if (right == '') {
                     additions.push([m1, '⋉']);
                     additions.push([m2, '⋉']);
+                    if (m1 == '') {
+                        additions.push([left, '⋉']);
+                    }
                 }
+                var additionSet = new Set;
                 for (var [a, b] of additions) {
                     if (a == '' || b == '') {
                         continue;
                     }
                     var key = a + ':' + b;
                     if (!preResult.hasOwnProperty(key)) {
-                        preResult[key] = 0;
+                        preResult[key] = new Set;
                     }
-                    preResult[key]++;
+                    for (var w of [t.replace('_', m1), t.replace('_', m2)]) {
+                        if (('⋊' + w + '⋉').includes(a + b)) {
+                            preResult[key].add(w);
+                        }
+                    }
                 }
             }
         }
         var result = [];
         for (var ab of Object.keys(preResult)) {
             var [a, b] = ab.split(':');
-            result.push([preResult[ab], a, b]);
+            result.push([preResult[ab].size, a, b]);
         }
         return result;
     },
@@ -260,15 +269,9 @@ Morphology = {
                 preResult[key] -= score;
             }
         }
-        var relevantMorphemes = new Set;
-        for (var key of Object.keys(preResult)) {
-            var [m1, m2] = key.split(':');
-            if (Math.abs(preResult[key]) < Morphology.minEdgeStrength) {
-                continue;
-            }
-            relevantMorphemes.add(m1);
-            relevantMorphemes.add(m2);
-        }
+        var relevantMorphemes = Array.from(morphemes);
+        relevantMorphemes.sort((l, r) => l.length - r.length);
+        relevantMorphemes = relevantMorphemes.slice(0, Morphology.pruningThreshold);
         var morphemeMapping = {};
         var k = 0;
         for (var morpheme of relevantMorphemes) {
@@ -281,9 +284,10 @@ Morphology = {
                 result[i].push(0);
             }
         }
+        relevantMorphemes = new Set(relevantMorphemes);
         for (var key of Object.keys(preResult)) {
             var [m1, m2] = key.split(':');
-            if (Math.abs(preResult[key]) < Morphology.minEdgeStrength) {
+            if (!relevantMorphemes.has(m1) || !relevantMorphemes.has(m2)) {
                 continue;
             }
             if (preResult[key] > 0) {
@@ -360,11 +364,11 @@ Morphology = {
             var [x1, y1] = [candidate.x, candidate.y];
             failed = false;
             for (var other of result) {
-                if (candidate == other) {
+                if (candidate == other || other == null) {
                     continue;
                 }
                 [x2, y2] = [other.x, other.y];
-                if (Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2)) < 1.15 * radius || x1 < radius || y1 < radius || x1 + radius > width || y1 + radius > height) {
+                if (Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2)) < 1.25 * radius || x1 < radius || y1 < radius || x1 + radius > width || y1 + radius > height) {
                     failed = true;
                     break;
                 }
@@ -374,7 +378,11 @@ Morphology = {
                 numFailures++;
                 epsilon += radius * 0.25;
             } else {
-                result.push(candidate);
+                if (!failed) {
+                    result.push(candidate);
+                } else {
+                    result.push(null);
+                }
                 numFailures = 0;
                 epsilon = radius;
             }
@@ -456,6 +464,7 @@ Morphology = {
                     result[i].morphemes.push(reverseMorphemeMapping[j]);
                 }
             }
+            result[i].morphemes.sort();
             // result[i].prefix = false;
             // if (!result[i].open) {
             //     result[i]

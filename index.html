@@ -51,13 +51,6 @@
         .cluster p {
             font-size: 14px;
         }
-
-        .complexity-notice {
-            background: lightyellow;
-            padding: 10px;
-            margin: 0 10px;
-            max-width: 800px;
-        }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/luminous-lightbox/2.0.0/luminous-basic.min.css">
 
@@ -123,10 +116,6 @@
                         results[e.data.task] = e.data.result;
                         if (e.data.task == 'getRelevantEdges') {
                             showResults();
-                        }
-                        if (e.data.task == 'getMorphemes' && results.getMorphemes.size > 4000) {
-                            $('.complexity-notice .num-morphemes').text(results.getMorphemes.size);
-                            $('.complexity-notice').show();
                         }
                     }
                     if (e.data.state == 'failed') {
@@ -206,10 +195,7 @@
             <dt>Rusų kalba</dt>
             <dd>
                 <ul class="texts">
-                    <li>
-                        <a href="#" data-src="14741-0.txt">Гавриил Романович Державин. <em>Духовные оды</em></a><br>
-                        <em>Pastaba.</em> Dėl nedidelės teksto apimties, minimalus komutaciją įrodančių žodžių skaičius (vienas iš parametrų) turi būti nustatytas mažesnis, nei įprasta.
-                    </li>
+                    <li><a href="#" data-src="14741-0.txt">Гавриил Романович Державин. <em>Духовные оды</em></a></li>
                 </ul>
             </dd>
 
@@ -248,10 +234,6 @@
                 <td><input type="number" data-key="minCommutationStrength" value="100"></td>
             </tr>
             <tr>
-                <td>Minimalus reikšmingos bigramos dažnis</td>
-                <td><input type="number" data-key="minEdgeStrength" value="5"></td>
-            </tr>
-            <tr>
                 <td>Pirmojo grupavimo grupių skaičius</td>
                 <td><input type="number" data-key="firstPassClusterCount" value="70"></td>
             </tr>
@@ -259,11 +241,14 @@
                 <td>Antrojo grupavimo grupių skaičius</td>
                 <td><input type="number" data-key="secondPassClusterCount" value="35"></td>
             </tr>
+            <tr>
+                <td>Maksimalus aktualių morfemų skaičius</td>
+                <td><input type="number" data-key="pruningThreshold" value="2000"></td>
+            </tr>
         </table>
     </section>
     <section class="progress-section">
         <h2>Eiga</h2>
-        <div class="complexity-notice" style="display: none;">Iškeltų kandidatinių morfemų skaičius yra <span class="num-morphemes">0</span>. Kai jis siekia kelis tūkstančius ar daugiau, rekomenduojama padidinti (kelis kartus) minimalų komutaciją įrodančių žodžių skaičių &ndash; vieną iš parametrų. Kitu atveju algoritmas veiks nepraktiškai ilgai.</div>
         <ul class="tasks">
             <li data-task="extractWords">Išrinkti žodžius</li>
             <li data-task="addBoundaryChars">Sudėti ribų ženklus</li>
