@@ -1,8 +1,27 @@
 $(() => {
     window.Visualization = {
+        vertexRadius: 7,
+        width: 600,
+        height: 600,
+
+        createImages: (clusters, morphemeMapping, edges, layout) => {
+            var numClusters = 0;
+            var result = [];
+            for (var c of clusters) {
+                numClusters = Math.max(numClusters, c + 1);
+            }
+            for (var i = 0; i < numClusters; i++) {
+                var canvas = Visualization.createHiDPICanvas(Visualization.width, Visualization.height);
+                Visualization.drawClusterRelations(i, clusters, morphemeMapping, edges, layout, canvas, Visualization.vertexRadius);
+                result.push(canvas.toDataURL('ímage/png'));
+            }
+            return result;
+        },
+
         drawClusterRelations: (cluster, clusters, morphemeMapping, edges, layout, canvas, vertexRadius) => {
             var ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, Visualization.width, Visualization.height);
             var numClusters = 0;
             for (var c of clusters) {
                 numClusters = Math.max(numClusters, c + 1);
@@ -40,9 +59,6 @@ $(() => {
             for (var m of Object.keys(morphemeMapping)) {
                 var i = morphemeMapping[m];
                 var hue = parseInt(330 * clusters[i] / numClusters);
-                while (hue > 360) {
-                    hue -= 360;
-                }
                 ctx.fillStyle = 'hsl(' + hue + ', 100%, 50%)';
                 ctx.beginPath();
                 ctx.arc(layout[i].x, layout[i].y, vertexRadius, 0, 2 * Math.PI);

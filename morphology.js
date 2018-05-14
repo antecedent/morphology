@@ -407,11 +407,61 @@ Morphology = {
         for (var i = 0; i < count; i++) {
             progressCallback(i, count);
             for (var j = 0; j < count; j++) {
-                if (adjacencyMatrix[i][j] >= 1 / Morphology.edgeThresholdFactor) {
+                if (adjacencyMatrix[i][j] > 0) {
                     edges.push([i, j]);
                 }
             }
         }
         return edges;
+    },
+
+    guessClusterTypes: (numClusters, clusters, adjacencyMatrix, morphemeMapping) => {
+
+        //
+        // TODO
+        //
+
+        var reverseMorphemeMapping = [];
+        for (var morpheme of Object.keys(morphemeMapping)) {
+            reverseMorphemeMapping[morphemeMapping[morpheme]] = morpheme;
+        }
+        var counts = [];
+        for (var i = 0; i < numClusters; i++) {
+            counts.push(0);
+            for (var cluster of clusters) {
+                if (cluster == i) {
+                    counts[i]++;
+                }
+            }
+        }
+        var sortedCounts = new Array(counts);
+        var prefixSums = [sortedCounts[0]];
+        for (var i = 1; i < numClusters; i++) {
+            prefixSums[i] = prefixSums[i - 1] + sortedCounts[i];
+        }
+        var pivot = 0;
+        for (var i = 0; i < numClusters; i++) {
+            if (prefixSums[i] > 0.2 * prefixSums[numClusters - 1]) {
+                pivot = sortedCounts[i];
+                break;
+            }
+        }
+        var result = [];
+        for (var i = 0; i < numClusters; i++) {
+             result.push({});
+            // result[i].open = counts[i] >= pivot;
+            result[i].morphemes = [];
+            for (var j = 0; j < reverseMorphemeMapping.length; j++) {
+                if (clusters[j] == i) {
+                    result[i].morphemes.push(reverseMorphemeMapping[j]);
+                }
+            }
+            // result[i].prefix = false;
+            // if (!result[i].open) {
+            //     result[i]
+            // }
+            // result[i].marginal = false;
+        }
+        return result;
     }
 };

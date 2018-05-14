@@ -40,9 +40,7 @@ onmessage = (e) => {
         var words = task('extractWords', () => Morphology.extractWords(e.data.text));
         var wordsWithBoundaries = task('addBoundaryChars', () => Morphology.addBoundaryChars(words));
         var substrings = task('getSalientSubstrings', () => Morphology.getSalientSubstrings(wordsWithBoundaries));
-        // TODO progress callback
         var commutations = task('commute', () => Morphology.commute(substrings, wordsWithBoundaries, progress('commute')));
-        // TODO progress callback
         var commutations = task('refineCommutations', () => Morphology.refineCommutations(commutations, words, progress('refineCommutations')));
         var bigrams = task('getBigrams', () => Morphology.getBigrams(commutations));
         var morphemes = task('getMorphemes', () => Morphology.getMorphemes(bigrams));
@@ -51,6 +49,7 @@ onmessage = (e) => {
         var secondPassClusters = task('doSecondPassClustering', () => Morphology.doSecondPassClustering(adjacencyMatrix, firstPassClusters));
         var numClusters;
         [secondPassClusters, numClusters] = task('renumberClusters', () => Morphology.renumberClusters(secondPassClusters, Morphology.secondPassClusterCount));
+        var morphemeTypes = task('guessClusterTypes', () => Morphology.guessClusterTypes(numClusters, secondPassClusters, adjacencyMatrix, morphemeMapping));
         var layout = task('generateLayout', () => Morphology.generateLayout(morphemes.size, secondPassClusters, numClusters, e.data.canvasWidth, e.data.canvasHeight, e.data.vertexRadius, progress('generateLayout')));
         var edges = task('getRelevantEdges', () => Morphology.getRelevantEdges(adjacencyMatrix, morphemeMapping, progress('getRelevantEdges')));
     } catch (error) {

@@ -4,6 +4,10 @@
     <meta charset="utf-8">
     <title>Savarankiška morfemų paieška tekste</title>
     <style type="text/css">
+        * {
+            font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
+        }
+
         .tasks li {
             color: gray;
         }
@@ -24,19 +28,66 @@
             display: block;
             margin: 0 auto;
         }
+
+        .cluster a {
+            margin: 10px;
+            margin-right: 30px;
+            display: block;
+            float: left;
+        }
+
+        .cluster {
+            overflow: auto;
+            background: #EEE;
+            margin: 10px;
+            padding: 10px;
+            transition: background 0.2s linear;
+        }
+
+        .cluster:hover {
+            background: #EEF8FF;
+        }
+
+        .cluster p {
+            font-size: 14px;
+        }
     </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/luminous-lightbox/2.0.0/luminous-basic.min.css">
     <script
       src="https://code.jquery.com/jquery-3.3.1.min.js"
       integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
       crossorigin="anonymous"></script>
     <script src="visualization.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/luminous-lightbox/2.0.0/Luminous.min.js"></script>
     <script>
         $(() => {
-            var vertexRadius = 7;
-            var canvasSize = $(window).height() - 50;
-            var canvas = $(Visualization.createHiDPICanvas(canvasSize, canvasSize)).appendTo($('body')).hide()[0];
-            var currentCluster = 0;
             var results = {};
+
+            var showResults = () => {
+                $('.tasks li[data-task=render]').addClass('progress');
+                var images = Visualization.createImages(
+                    results.renumberClusters[0],
+                    results.getAdjacencyMatrix[1],
+                    results.getRelevantEdges,
+                    results.generateLayout
+                );
+                $('.tasks li[data-task=render]').removeClass().addClass('completed');
+                $('.progress-section').hide();
+                $('.results-section').show();
+                var k = 0;
+                for (var image of images) {
+                    var hue = parseInt(330 * k / results.renumberClusters[1]);
+                    var div = $('<div class="cluster">').appendTo($('.results-section'));
+                    var img = $('<img>').attr('src', image).attr('width', 200).attr('height', 200);
+                    var a = $('<a>').attr('href', image).append(img).appendTo(div);
+                    var h3 = $('<h3>' + (k + 1) + ' grupė <span style="color: hsl(' + hue + ', 100%, 50%);">&bull;</span></h3>').appendTo(div);
+                    var p = $('<p>' + results.guessClusterTypes[k].morphemes.join(', ') + '</p>').appendTo(div);
+                    k++;
+                }
+                for (var link of document.querySelectorAll('.cluster a')) {
+                    new Luminous(link);
+                }
+            };
 
             $('.texts a').click(function () {
                 $('.texts-section, .parameters-section').hide();
@@ -54,20 +105,7 @@
                             element.find('.progress').text('100');
                             results[e.data.task] = e.data.result;
                             if (e.data.task == 'getRelevantEdges') {
-                                $(':not(canvas, :has(canvas))').hide();
-                                $('canvas').show();
-                                window.setInterval(() => {
-                                    Visualization.drawClusterRelations(
-                                        currentCluster,
-                                        results.renumberClusters[0],
-                                        results.getAdjacencyMatrix[1],
-                                        results.getRelevantEdges,
-                                        results.generateLayout,
-                                        canvas,
-                                        vertexRadius
-                                    );
-                                    currentCluster = (currentCluster + 1) % results.renumberClusters[1];
-                                }, 1000);
+                                showResults();
                             }
                         }
                         if (e.data.state == 'failed') {
@@ -81,9 +119,9 @@
                     });
                     worker.postMessage({
                         text: text,
-                        vertexRadius: vertexRadius,
-                        canvasWidth: canvasSize,
-                        canvasHeight: canvasSize,
+                        vertexRadius: Visualization.vertexRadius,
+                        canvasWidth: Visualization.width,
+                        canvasHeight: Visualization.height,
                         parameters: parameters
                     });
                 });
@@ -131,10 +169,10 @@
     <section class="parameters-section">
         <h2>Parametrai</h2>
         <table>
-            <tr>
+            <!-- <tr>
                 <td>Kaimynysčių įtraukties koeficientas</td>
                 <td><input type="number" data-key="edgeThresholdFactor" value="5"></td>
-            </tr>
+            </tr> -->
             <tr>
                 <td>Idealus morfemos ilgis</td>
                 <td><input type="number" data-key="preferredMorphemeLength" value="3"></td>
@@ -161,21 +199,29 @@
             </tr>
         </table>
     </section>
-    <h2>Eiga</h2>
-    <ul class="tasks">
-        <li data-task="extractWords">Išrinkti žodžius</li>
-        <li data-task="addBoundaryChars">Sudėti ribų ženklus</li>
-        <li data-task="getSalientSubstrings">Rasti dažnai pasikartojančias raidžių samplaikas</li>
-        <li data-task="commute">Atlikti komutacijų testus (<span class="progress">0</span>%)</li>
-        <li data-task="refineCommutations">Patikslinti komutacijų testų rezultatus (<span class="progress">0</span>%)</li>
-        <li data-task="getBigrams">Sužymėti galimų morfemų kaimynystę</li>
-        <li data-task="getMorphemes">Paskelbti kandidatines morfemas</li>
-        <li data-task="getAdjacencyMatrix">Sudaryti kaimynystės matricą</li>
-        <li data-task="doFirstPassClustering">Sugrupuoti morfemas su panašiomis kaimynystės savybėmis</li>
-        <li data-task="doSecondPassClustering">Patikslinti morfemų grupavimą</li>
-        <li data-task="renumberClusters">Atnaujinti grupių numeraciją</li>
-        <li data-task="generateLayout">Išdėstyti kaimynystės schemą plokštumoje (<span class="progress">0</span>%)</li>
-        <li data-task="getRelevantEdges">Išrinkti rodykles iš kaimynystės matricos (<span class="progress">0</span>%)</li>
-    </ul>
+    <section class="progress-section">
+        <h2>Eiga</h2>
+        <ul class="tasks">
+            <li data-task="extractWords">Išrinkti žodžius</li>
+            <li data-task="addBoundaryChars">Sudėti ribų ženklus</li>
+            <li data-task="getSalientSubstrings">Rasti dažnai pasikartojančias raidžių samplaikas</li>
+            <li data-task="commute">Atlikti komutacijų testus (<span class="progress">0</span>%)</li>
+            <li data-task="refineCommutations">Patikslinti komutacijų testų rezultatus (<span class="progress">0</span>%)</li>
+            <li data-task="getBigrams">Sužymėti galimų morfemų kaimynystę</li>
+            <li data-task="getMorphemes">Paskelbti kandidatines morfemas</li>
+            <li data-task="getAdjacencyMatrix">Sudaryti kaimynystės matricą</li>
+            <li data-task="doFirstPassClustering">Sugrupuoti morfemas su panašiomis kaimynystės savybėmis</li>
+            <li data-task="doSecondPassClustering">Patikslinti morfemų grupavimą</li>
+            <li data-task="renumberClusters">Atnaujinti grupių numeraciją</li>
+            <li data-task="guessClusterTypes">Nustatyti morfemų grupių tipus</li>
+            <li data-task="generateLayout">Išdėstyti kaimynystės schemą plokštumoje (<span class="progress">0</span>%)</li>
+            <li data-task="getRelevantEdges">Išrinkti rodykles iš kaimynystės matricos (<span class="progress">0</span>%)</li>
+            <li data-task="render">Nupiešti kaimynystės diagramas</li>
+        </ul>
+    </section>
+    <section class="results-section" style="display: none;">
+        <h2>Rezultatai</h2>
+        <p><a href="" target="_blank">Analizuoti kitą tekstą (naujame skirtuke)</a></p>
+    </section>
 </body>
 </html>
