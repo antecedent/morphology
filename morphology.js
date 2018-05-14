@@ -6,11 +6,11 @@ Morphology = {
     minCommutationStrength: 10,
     minEdgeStrength: 1,
     firstPassSquashingFactor: 50,
-    firstPassClusterCount: 70,
+    firstPassClusterCount: 50,
     secondPassSquashingFactor: 150,
-    secondPassClusterCount: 35,
+    secondPassClusterCount: 25,
     edgeThresholdFactor: 5,
-    pruningThreshold: 2000,
+    pruningThreshold: 1000,
 
     extractWords: (text) => {
         var words = new Set;
@@ -340,7 +340,7 @@ Morphology = {
         for (var i = 0; i < adjacencyMatrix.length; i++) {
             for (var j = 0; j < adjacencyMatrix.length; j++) {
                 features[i][firstPassClusters[j]] += adjacencyMatrix[i][j];
-                features[j][firstPassClusters[i]] += adjacencyMatrix[i][j];
+                features[j][Morphology.firstPassClusterCount + firstPassClusters[i]] += adjacencyMatrix[i][j];
             }
         }
         for (var i = 0; i < adjacencyMatrix.length; i++) {
