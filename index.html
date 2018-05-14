@@ -53,6 +53,17 @@
         }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/luminous-lightbox/2.0.0/luminous-basic.min.css">
+
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-20483190-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-20483190-2');
+    </script>
+
     <script
       src="https://code.jquery.com/jquery-3.3.1.min.js"
       integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
@@ -61,7 +72,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/luminous-lightbox/2.0.0/Luminous.min.js"></script>
     <script>
         $(() => {
-            var results = {};
+            window.results = {};
 
             var showResults = () => {
                 $('.tasks li[data-task=render]').addClass('progress');
@@ -89,43 +100,53 @@
                 }
             };
 
-            $('.texts a').click(function () {
+            var run = (text) => {
                 $('.texts-section, .parameters-section').hide();
-                $.get($(this).data('src'), (text) => {
-                    var worker = new Worker('worker.js');
-                    $('.tasks li').removeClass();
-                    $('.progress').text('0');
-                    worker.onmessage = (e) => {
-                        var element = $('.tasks li[data-task=?]'.replace('?', e.data.task));
-                        element.removeClass().addClass(e.data.state);
-                        if (e.data.state == 'progress') {
-                            element.find('.progress').text(e.data.progress);
+                var worker = new Worker('worker.js');
+                $('.tasks li').removeClass();
+                $('.progress').text('0');
+                worker.onmessage = (e) => {
+                    var element = $('.tasks li[data-task=?]'.replace('?', e.data.task));
+                    element.removeClass().addClass(e.data.state);
+                    if (e.data.state == 'progress') {
+                        element.find('.progress').text(e.data.progress);
+                    }
+                    if (e.data.state == 'completed') {
+                        element.find('.progress').text('100');
+                        results[e.data.task] = e.data.result;
+                        if (e.data.task == 'getRelevantEdges') {
+                            showResults();
                         }
-                        if (e.data.state == 'completed') {
-                            element.find('.progress').text('100');
-                            results[e.data.task] = e.data.result;
-                            if (e.data.task == 'getRelevantEdges') {
-                                showResults();
-                            }
-                        }
-                        if (e.data.state == 'failed') {
-                            worker.terminate();
-                            console.log(e.data.stack);
-                        }
-                    };
-                    var parameters = {};
-                    $('.parameters-section input').each(function () {
-                        parameters[$(this).data('key')] = parseInt($(this).val());
-                    });
-                    worker.postMessage({
-                        text: text,
-                        vertexRadius: Visualization.vertexRadius,
-                        canvasWidth: Visualization.width,
-                        canvasHeight: Visualization.height,
-                        parameters: parameters
-                    });
+                    }
+                    if (e.data.state == 'failed') {
+                        worker.terminate();
+                        console.log(e.data.stack);
+                    }
+                };
+                var parameters = {};
+                $('.parameters-section input').each(function () {
+                    parameters[$(this).data('key')] = parseInt($(this).val());
                 });
+                worker.postMessage({
+                    text: text,
+                    vertexRadius: Visualization.vertexRadius,
+                    canvasWidth: Visualization.width,
+                    canvasHeight: Visualization.height,
+                    parameters: parameters
+                });
+            };
+
+            $('.texts a').click(function () {
+                $.get($(this).data('src'), run);
                 return false;
+            });
+
+            $('#upload').change(function () {
+                var reader = new FileReader;
+                reader.readAsText(document.getElementById('upload').files[0]);
+                reader.onloadend = () => {
+                    run(reader.result);
+                };
             });
         });
     </script>
@@ -135,8 +156,14 @@
     <p>&copy; 2018 Ignas Rudaitis</p>
     <section class="texts-section">
         <h2>Pasirinkite tekstą</h2>
-        <p>Tekstai imami iš <a href="https://www.gutenberg.org/"><em>Project Gutenberg</em></a> ir <a href="http://www.antologija.lt/"><em>Antologija.lt</em></a>.</p>
+        <p>Numatytieji ekstai imami iš <a href="https://www.gutenberg.org/"><em>Project Gutenberg</em></a> ir <a href="http://www.antologija.lt/"><em>Antologija.lt</em></a>.</p>
         <dl>
+            <dt>Atidaryti failą</dt>
+            <dd>
+                <p><input id="upload" type="file"></p>
+                <p>Pastaba: failas iš vietinio įrenginio niekur nesiunčiamas.</p>
+            </dd>
+
             <dt>Anglų kalba</dt>
             <dd>
                 <ul class="texts">
@@ -164,6 +191,20 @@
                     <li><a href="#" data-src="14741-0.txt">Гавриил Романович Державин. <em>Духовные оды</em></a></li>
                 </ul>
             </dd>
+
+            <dt>Suomių kalba</dt>
+            <dd>
+                <ul class="texts">
+                    <li><a href="#" data-src="pg7000.txt"><em>Kalevala</em> (surinko Elias Lönnrot)</a></li>
+                </ul>
+            </dd>
+
+            <dt>Vokiečių kalba</dt>
+            <dd>
+                <ul class="texts">
+                    <li><a href="#" data-src="pg2230.txt">Johann Wolfgang von Goethe. <em>Faust: Der Tragödie zweiter Teil</em></a></li>
+                </ul>
+            </dd>
         </dl>
     </section>
     <section class="parameters-section">
@@ -179,11 +220,11 @@
             </tr>
             <tr>
                 <td>Įsimintinų raidžių samplaikų skaičius</td>
-                <td><input type="number" data-key="numSalientSubstrings" value="100"></td>
+                <td><input type="number" data-key="numSalientSubstrings" value="300"></td>
             </tr>
             <tr>
                 <td>Minimalus komutaciją įrodančių žodžių skaičius</td>
-                <td><input type="number" data-key="minCommutationStrength" value="10"></td>
+                <td><input type="number" data-key="minCommutationStrength" value="40"></td>
             </tr>
             <tr>
                 <td>Minimalus reikšmingos bigramos dažnis</td>
