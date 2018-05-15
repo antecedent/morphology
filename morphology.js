@@ -12,7 +12,7 @@ Morphology = {
     edgeThresholdFactor: 5,
     pruningThreshold: 1000,
     openClassThresholdFactor: 100,
-    successorThresholdFactor: 5,
+    successorThresholdFactor: 4,
     numWordsToInvent: 100,
 
     extractWords: (text) => {
