@@ -282,7 +282,9 @@ Morphology = {
         var morphemeMapping = {};
         var k = 0;
         for (var morpheme of relevantMorphemes) {
-            morphemeMapping[morpheme] = k++;
+            if (!morphemeMapping.hasOwnProperty(morpheme)) {
+                morphemeMapping[morpheme] = k++;
+            }
         }
         var result = [];
         for (var i = 0; i < k; i++) {
@@ -521,7 +523,6 @@ Morphology = {
         var result = new Set;
         var numFailures = 0;
         while (result.size < Morphology.numWordsToInvent && numFailures < 10) {
-            console.log(numFailures);
             progressCallback(result.size, Morphology.numWordsToInvent);
             var invention = [];
             var state = initial;
