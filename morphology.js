@@ -12,7 +12,7 @@ Morphology = {
     edgeThresholdFactor: 5,
     pruningThreshold: 1000,
     openClassThresholdFactor: 100,
-    successorThresholdFactor: 2,
+    successorThresholdFactor: 5,
     numWordsToInvent: 100,
 
     extractWords: (text) => {
@@ -520,7 +520,8 @@ Morphology = {
     inventWords: (numClusters, clusterInfo, initial, final, words, progressCallback) => {
         var result = new Set;
         var numFailures = 0;
-        while (result.size < Morphology.numWordsToInvent && numFailures < 1000) {
+        while (result.size < Morphology.numWordsToInvent && numFailures < 10) {
+            console.log(numFailures);
             progressCallback(result.size, Morphology.numWordsToInvent);
             var invention = [];
             var state = initial;
