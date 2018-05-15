@@ -37,14 +37,25 @@ onmessage = (e) => {
         Morphology[key] = e.data.parameters[key];
     }
     try {
-        var words = task('extractWords', () => Morphology.extractWords(e.data.text));
+        var preliminaryWords = e.data.text.split(/\s+/);
+        var trainingSetPivot = parseInt(preliminaryWords.length / (Morphology.trainingSetProportion + 1) * Morphology.trainingSetProportion);
+        var trainingSet = preliminaryWords.slice(0, trainingSetPivot).join(' ');
+        var validationSet = preliminaryWords.slice(trainingSetPivot).join(' ');
+        var words = task('extractWords', () => Morphology.extractWords(trainingSet));
+        var validationWords = Morphology.extractWords(validationSet);
+        for (var word of validationWords) {
+            if (words.has(word)) {
+                validationWords.delete(word);
+            }
+        }
+        task('getValidationSet', () => validationWords);
         var wordsWithBoundaries = task('addBoundaryChars', () => Morphology.addBoundaryChars(words));
         var substrings = task('getSalientSubstrings', () => Morphology.getSalientSubstrings(wordsWithBoundaries));
         var commutations = task('commute', () => Morphology.commute(substrings, wordsWithBoundaries, progress('commute')));
         var commutations = task('refineCommutations', () => Morphology.refineCommutations(commutations, words, progress('refineCommutations')));
         var bigrams = task('getBigrams', () => Morphology.getBigrams(commutations));
         var morphemes = task('getMorphemes', () => Morphology.getMorphemes(bigrams));
-        var [adjacencyMatrix, morphemeMapping] = task('getAdjacencyMatrix', () => Morphology.getAdjacencyMatrix(bigrams, morphemes, e.data.text.toLowerCase()));
+        var [adjacencyMatrix, morphemeMapping] = task('getAdjacencyMatrix', () => Morphology.getAdjacencyMatrix(bigrams, morphemes, trainingSet.toLowerCase()));
         var firstPassClusters = task('doFirstPassClustering', () => Morphology.doFirstPassClustering(adjacencyMatrix));
         var secondPassClusters = task('doSecondPassClustering', () => Morphology.doSecondPassClustering(adjacencyMatrix, firstPassClusters));
         var numClusters;

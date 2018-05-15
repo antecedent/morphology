@@ -47,6 +47,7 @@
         .morphotactics {
             background: #555;
             color: white;
+            max-height: 100px;
         }
 
         .cluster:hover {
@@ -56,6 +57,17 @@
         .cluster p, .morphotactics p {
             font-size: 14px;
         }
+
+        .divergence-notice {
+            padding: 15px;
+            margin: 15px 10px;
+            background: lightyellow;
+        }
+
+        .success {
+            color: lightgreen;
+        }
+
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/luminous-lightbox/2.0.0/luminous-basic.min.css">
 
@@ -90,7 +102,24 @@
                 $('.tasks li[data-task=render]').removeClass().addClass('completed');
                 $('.progress-section').hide();
                 $('.results-section').show();
-                $('.neologisms').text(results.inventWords.join(', '));
+                var successRate = 0;
+                var neologisms = results.inventWords.map((w) => {
+                    if (results.getValidationSet.has(w)) {
+                        successRate++;
+                        return '<span class="success">' + w + '</span>';
+                    }
+                    return w;
+                });
+                neologisms.sort();
+                $('.neologisms').html(neologisms.join(', '));
+                var percentage = 100 * successRate / parseInt($('[data-key=numWordsToInvent]').val());
+                $('.success-rate').text(percentage.toFixed(2).replace('.', ','));
+                if (isNaN(percentage)) {
+                    $('.morphotactics').hide();
+                }
+                if (isNaN(percentage) || percentage == 0) {
+                    $('.divergence-notice').show();
+                }
                 var k = 0;
                 for (var image of images) {
                     var hue = parseInt(330 * k / results.renumberClusters[1]);
@@ -238,7 +267,7 @@
             </tr>
             <tr>
                 <td>Minimalus komutaciją įrodančių žodžių skaičius</td>
-                <td><input type="number" data-key="minCommutationStrength" value="100"></td>
+                <td><input type="number" data-key="minCommutationStrength" value="50"></td>
             </tr>
             <tr>
                 <td>Pirmojo grupavimo grupių skaičius</td>
@@ -254,7 +283,15 @@
             </tr>
             <tr>
                 <td>Morfotaktinių ryšių įtraukties koeficientas</td>
-                <td><input type="number" data-key="successorThresholdFactor" value="4"></td>
+                <td><input type="number" data-key="successorThresholdFactor" value="5"></td>
+            </tr>
+            <tr>
+                <td>Apmokymui skirta teksto proporcija (N : 1)</td>
+                <td><input type="number" data-key="trainingSetProportion" value="5"></td>
+            </tr>
+            <tr>
+                <td>Generuotinų naujadarų skaičius</td>
+                <td><input type="number" data-key="numWordsToInvent" value="10000"></td>
             </tr>
             <!-- <tr>
                 <td>Klasės uždarumo slenksčio koeficientas</td>
@@ -286,9 +323,12 @@
     <section class="results-section" style="display: none;">
         <h2>Rezultatai</h2>
         <p><a href="" target="_blank">Analizuoti kitą tekstą (naujame skirtuke)</a></p>
+        <div class="divergence-notice" style="display: none;">
+            Naujadarų generavimas nedavė rezultatų. Gali reikėti pasirinkti ilgesnį tekstą arba tiesiog paleisti algoritmą dar kartą.
+        </div>
         <div class="morphotactics">
             <!--<a href="#"><img src="#"></a>-->
-            <h3>Morfotaktiniai ryšiai tarp grupių</h3>
+            <h3><span class="success-rate">0</span>% prognozavimo tikslumas</h3>
             <p><strong>Modelio prognozuojami naujadarai:</strong> <span class="neologisms"></span></p>
         </div>
     </section>

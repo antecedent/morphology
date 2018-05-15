@@ -3,7 +3,7 @@ Morphology = {
     trailingPunctuation: /[!"#$%&\'()*+,-./:;<=>?@\[\\\]\^_`{|}~—‘’“”¿¡«»-]*$/,
     preferredMorphemeLength: 3,
     numSalientSubstrings: 1000,
-    minCommutationStrength: 10,
+    minCommutationStrength: 50,
     minEdgeStrength: 1,
     firstPassSquashingFactor: 50,
     firstPassClusterCount: 100,
@@ -12,8 +12,10 @@ Morphology = {
     edgeThresholdFactor: 5,
     pruningThreshold: 1000,
     openClassThresholdFactor: 100,
-    successorThresholdFactor: 4,
-    numWordsToInvent: 100,
+    successorThresholdFactor: 5,
+    numWordsToInvent: 10000,
+    commutationAnomalyFactor: 20,
+    trainingSetProportion: 5,
 
     extractWords: (text) => {
         var words = new Set;
@@ -191,10 +193,44 @@ Morphology = {
         var result = [];
         for (var c of Object.keys(preResult)) {
             var [m1, m2] = c.split(':');
-            if (preResult[c].size > Morphology.minCommutationStrength)
-                result.push([preResult[c], m1, m2]);
+            var set = Morphology.removeAnomalies(preResult[c]);
+            if (set.size > Morphology.minCommutationStrength) {
+                result.push([set, m1, m2]);
+            }
         }
         return result;
+    },
+
+    removeAnomalies: (commutationProofs) => {
+        commutationProofs = Array.from(commutationProofs);
+        var distribution = {
+            right: [],
+            rightMarginal: [],
+            left: [],
+            leftMarginal: []
+        };
+        for (var proof of commutationProofs) {
+            var pivot = proof.indexOf('_');
+            if (pivot == 0) {
+                distribution.leftMarginal.push(proof);
+            } else if (pivot == proof.length - 1) {
+                distribution.rightMarginal.push(proof);
+            } else if (pivot < proof.length / 2) {
+                distribution.left.push(proof);
+            } else {
+                distribution.right.push(proof);
+            }
+        }
+        var max = Object.values(distribution).reduce((a, x) => Math.max(a, x.length), 0);
+        var sum = Object.values(distribution).reduce((a, x) => a + x.length, 0);
+        if (max > sum * (1 - 1 / Morphology.commutationAnomalyFactor)) {
+            for (var type of Object.keys(distribution)) {
+                if (distribution[type].length == max) {
+                    return new Set(distribution[type]);
+                }
+            }
+        }
+        return new Set;
     },
 
     getBigrams: (commutations) => {
@@ -521,32 +557,26 @@ Morphology = {
 
     inventWords: (numClusters, clusterInfo, initial, final, words, progressCallback) => {
         var result = new Set;
-        var numFailures = 0;
-        while (result.size < Morphology.numWordsToInvent && numFailures < 10) {
+        var invent = (prefix, state) => {
+            if (state == final && prefix.length > 0 && !words.has(prefix)) {
+                result.add(prefix);
+                return;
+            }
             progressCallback(result.size, Morphology.numWordsToInvent);
-            var invention = [];
-            var state = initial;
-            var failed = false;
-            while (state != final) {
-                invention.push(clusterInfo[state].morphemes[parseInt(Math.random() * clusterInfo[state].morphemes.length)]);
-                if (clusterInfo[state].successors.length == 0) {
-                    failed = true;
-                    break;
-                }
-                var state = clusterInfo[state].successors[parseInt(Math.random() * clusterInfo[state].successors.length)];
+            if (result.size >= Morphology.numWordsToInvent) {
+                return;
             }
-            if (!failed) {
-                var invention = invention.slice(1).join('');
-                if (!words.has(invention)) {
-                    result.add(invention);
-                    numFailures = 0;
-                } else {
-                    numFailures++;
+            for (var successor of clusterInfo[state].successors) {
+                for (var morpheme of clusterInfo[state].morphemes) {
+                    invent(prefix + morpheme, successor);
                 }
-            } else {
-                numFailures++;
             }
+        };
+        for (var next of clusterInfo[initial].successors) {
+            invent('', next);
         }
-        return Array.from(result);
+        result = Array.from(result);
+        result.sort();
+        return result;
     }
 };
