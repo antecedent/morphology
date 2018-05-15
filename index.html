@@ -29,14 +29,14 @@
             margin: 0 auto;
         }
 
-        .cluster a {
+        .cluster a, .morphotactics a {
             margin: 10px;
             margin-right: 30px;
             display: block;
             float: left;
         }
 
-        .cluster {
+        .cluster, .morphotactics {
             overflow: auto;
             background: #EEE;
             margin: 10px;
@@ -44,11 +44,16 @@
             transition: background 0.2s linear;
         }
 
+        .morphotactics {
+            background: #555;
+            color: white;
+        }
+
         .cluster:hover {
             background: #EEF8FF;
         }
 
-        .cluster p {
+        .cluster p, .morphotactics p {
             font-size: 14px;
         }
     </style>
@@ -85,6 +90,7 @@
                 $('.tasks li[data-task=render]').removeClass().addClass('completed');
                 $('.progress-section').hide();
                 $('.results-section').show();
+                $('.neologisms').text(results.inventWords.join(', '));
                 var k = 0;
                 for (var image of images) {
                     var hue = parseInt(330 * k / results.renumberClusters[1]);
@@ -92,10 +98,11 @@
                     var img = $('<img>').attr('src', image).attr('width', 200).attr('height', 200);
                     var a = $('<a>').attr('href', image).append(img).appendTo(div);
                     var h3 = $('<h3>' + (k + 1) + ' grupė <span style="color: hsl(' + hue + ', 100%, 50%);">&bull;</span></h3>').appendTo(div);
+                    $('<p><em>' + (results.guessClusterTypes[k].open ? 'Atvira klasė' : 'Uždara klasė') + '</em></p>').appendTo(div);
                     var p = $('<p>' + results.guessClusterTypes[k].morphemes.join(', ') + '</p>').appendTo(div);
                     k++;
                 }
-                for (var link of document.querySelectorAll('.cluster a')) {
+                for (var link of document.querySelectorAll('.cluster a, .morphotactics a')) {
                     new Luminous(link);
                 }
             };
@@ -114,7 +121,7 @@
                     if (e.data.state == 'completed') {
                         element.find('.progress').text('100');
                         results[e.data.task] = e.data.result;
-                        if (e.data.task == 'getRelevantEdges') {
+                        if (e.data.task == 'inventWords') {
                             showResults();
                         }
                     }
@@ -235,15 +242,23 @@
             </tr>
             <tr>
                 <td>Pirmojo grupavimo grupių skaičius</td>
-                <td><input type="number" data-key="firstPassClusterCount" value="50"></td>
+                <td><input type="number" data-key="firstPassClusterCount" value="100"></td>
             </tr>
             <tr>
                 <td>Antrojo grupavimo grupių skaičius</td>
-                <td><input type="number" data-key="secondPassClusterCount" value="25"></td>
+                <td><input type="number" data-key="secondPassClusterCount" value="50"></td>
             </tr>
             <tr>
                 <td>Maksimalus aktualių morfemų skaičius</td>
                 <td><input type="number" data-key="pruningThreshold" value="1000"></td>
+            </tr>
+            <tr>
+                <td>Morfotaktinių ryšių įtraukties koeficientas</td>
+                <td><input type="number" data-key="successorThresholdFactor" value="2"></td>
+            </tr>
+            <tr>
+                <td>Klasės uždarumo slenksčio koeficientas</td>
+                <td><input type="number" data-key="openClassThresholdFactor" value="100"></td>
             </tr>
         </table>
     </section>
@@ -264,12 +279,18 @@
             <li data-task="guessClusterTypes">Nustatyti morfemų grupių tipus</li>
             <li data-task="generateLayout">Išdėstyti kaimynystės schemą plokštumoje (<span class="progress">0</span>%)</li>
             <li data-task="getRelevantEdges">Išrinkti rodykles iš kaimynystės matricos (<span class="progress">0</span>%)</li>
+            <li data-task="inventWords">Kurti naujadarus (<span class="progress">0</span>%)</li>
             <li data-task="render">Nupiešti kaimynystės diagramas</li>
         </ul>
     </section>
     <section class="results-section" style="display: none;">
         <h2>Rezultatai</h2>
         <p><a href="" target="_blank">Analizuoti kitą tekstą (naujame skirtuke)</a></p>
+        <div class="morphotactics">
+            <!--<a href="#"><img src="#"></a>-->
+            <h3>Morfotaktiniai ryšiai tarp grupių</h3>
+            <p><strong>Modelio prognozuojami naujadarai:</strong> <span class="neologisms"></span></p>
+        </div>
     </section>
 </body>
 </html>

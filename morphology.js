@@ -6,11 +6,14 @@ Morphology = {
     minCommutationStrength: 10,
     minEdgeStrength: 1,
     firstPassSquashingFactor: 50,
-    firstPassClusterCount: 50,
+    firstPassClusterCount: 100,
     secondPassSquashingFactor: 150,
-    secondPassClusterCount: 25,
+    secondPassClusterCount: 50,
     edgeThresholdFactor: 5,
     pruningThreshold: 1000,
+    openClassThresholdFactor: 100,
+    successorThresholdFactor: 2,
+    numWordsToInvent: 100,
 
     extractWords: (text) => {
         var words = new Set;
@@ -256,7 +259,7 @@ Morphology = {
         return result;
     },
 
-    getAdjacencyMatrix: (bigrams, morphemes) => {
+    getAdjacencyMatrix: (bigrams, morphemes, text) => {
         var preResult = {};
         for (var [score, m1, m2] of bigrams) {
             var key = (m1 < m2) ? (m1 + ':' + m2) : (m2 + ':' + m1);
@@ -270,8 +273,12 @@ Morphology = {
             }
         }
         var relevantMorphemes = Array.from(morphemes);
-        relevantMorphemes.sort((l, r) => l.length - r.length);
-        relevantMorphemes = relevantMorphemes.slice(0, Morphology.pruningThreshold);
+        var frequencies = {};
+        for (var morpheme of relevantMorphemes) {
+            frequencies[morpheme] = (text.match(new RegExp(morpheme, 'g')) || []).length;
+        }
+        relevantMorphemes.sort((l, r) => frequencies[r] - frequencies[l]);
+        relevantMorphemes = ['⋊', '⋉'].concat(relevantMorphemes.slice(0, Morphology.pruningThreshold));
         var morphemeMapping = {};
         var k = 0;
         for (var morpheme of relevantMorphemes) {
@@ -390,10 +397,6 @@ Morphology = {
         return result;
     },
 
-    computeMorphotactics: () => {
-
-    },
-
     renumberClusters: (clusters, numClusters) => {
         var translation = {};
         var result = [];
@@ -442,22 +445,22 @@ Morphology = {
                 }
             }
         }
-        var sortedCounts = new Array(counts);
+        var sortedCounts = Array.from(counts);
         var prefixSums = [sortedCounts[0]];
         for (var i = 1; i < numClusters; i++) {
             prefixSums[i] = prefixSums[i - 1] + sortedCounts[i];
         }
         var pivot = 0;
         for (var i = 0; i < numClusters; i++) {
-            if (prefixSums[i] > 0.2 * prefixSums[numClusters - 1]) {
+            if (prefixSums[i] > (1 / Morphology.openClassThresholdFactor) * prefixSums[numClusters - 1]) {
                 pivot = sortedCounts[i];
                 break;
             }
         }
         var result = [];
         for (var i = 0; i < numClusters; i++) {
-             result.push({});
-            // result[i].open = counts[i] >= pivot;
+            result.push({});
+            result[i].open = counts[i] >= pivot;
             result[i].morphemes = [];
             for (var j = 0; j < reverseMorphemeMapping.length; j++) {
                 if (clusters[j] == i) {
@@ -471,6 +474,77 @@ Morphology = {
             // }
             // result[i].marginal = false;
         }
+        for (var i = 0; i < numClusters; i++) {
+            result[i].successors = [];
+            for (var j = 0; j < numClusters; j++) {
+                if (i == j) {
+                    continue;
+                }
+                var totalIn = 0;
+                var totalOut = 0;
+                var numIn = {};
+                var numOut = {};
+                for (var m1 of result[i].morphemes) {
+                    for (var m2 of result[j].morphemes) {
+                        if (adjacencyMatrix[morphemeMapping[m1]][morphemeMapping[m2]] > 0) {
+                            if (!numOut.hasOwnProperty(m1)) {
+                                numOut[m1] = 0;
+                            }
+                            if (!numIn.hasOwnProperty(m2)) {
+                                numIn[m2] = 0;
+                            }
+                            numOut[m1]++;
+                            numIn[m2]++;
+                        }
+                    }
+                }
+                for (var m of Object.keys(numIn)) {
+                    if (numIn[m] > result[i].morphemes.length / Morphology.successorThresholdFactor) {
+                        totalIn++;
+                    }
+                }
+                for (var m of Object.keys(numOut)) {
+                    if (numOut[m] > result[j].morphemes.length / Morphology.successorThresholdFactor) {
+                        totalOut++;
+                    }
+                }
+                if (totalIn > result[j].morphemes.length / Morphology.successorThresholdFactor &&
+                    totalOut > result[i].morphemes.length / Morphology.successorThresholdFactor) {
+                    result[i].successors.push(j);
+                }
+            }
+        }
         return result;
+    },
+
+    inventWords: (numClusters, clusterInfo, initial, final, words, progressCallback) => {
+        var result = new Set;
+        var numFailures = 0;
+        while (result.size < Morphology.numWordsToInvent && numFailures < 1000) {
+            progressCallback(result.size, Morphology.numWordsToInvent);
+            var invention = [];
+            var state = initial;
+            var failed = false;
+            while (state != final) {
+                invention.push(clusterInfo[state].morphemes[parseInt(Math.random() * clusterInfo[state].morphemes.length)]);
+                if (clusterInfo[state].successors.length == 0) {
+                    failed = true;
+                    break;
+                }
+                var state = clusterInfo[state].successors[parseInt(Math.random() * clusterInfo[state].successors.length)];
+            }
+            if (!failed) {
+                var invention = invention.slice(1).join('');
+                if (!words.has(invention)) {
+                    result.add(invention);
+                    numFailures = 0;
+                } else {
+                    numFailures++;
+                }
+            } else {
+                numFailures++;
+            }
+        }
+        return Array.from(result);
     }
 };
