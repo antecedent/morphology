@@ -98,7 +98,7 @@
                     var img = $('<img>').attr('src', image).attr('width', 200).attr('height', 200);
                     var a = $('<a>').attr('href', image).append(img).appendTo(div);
                     var h3 = $('<h3>' + (k + 1) + ' grupė <span style="color: hsl(' + hue + ', 100%, 50%);">&bull;</span></h3>').appendTo(div);
-                    $('<p><em>' + (results.guessClusterTypes[k].open ? 'Atvira klasė' : 'Uždara klasė') + '</em></p>').appendTo(div);
+                    //$('<p><em>' + (results.guessClusterTypes[k].open ? 'Atvira klasė' : 'Uždara klasė') + '</em></p>').appendTo(div);
                     var p = $('<p>' + results.guessClusterTypes[k].morphemes.join(', ') + '</p>').appendTo(div);
                     k++;
                 }
@@ -256,10 +256,10 @@
                 <td>Morfotaktinių ryšių įtraukties koeficientas</td>
                 <td><input type="number" data-key="successorThresholdFactor" value="4"></td>
             </tr>
-            <tr>
+            <!-- <tr>
                 <td>Klasės uždarumo slenksčio koeficientas</td>
                 <td><input type="number" data-key="openClassThresholdFactor" value="100"></td>
-            </tr>
+            </tr> -->
         </table>
     </section>
     <section class="progress-section">
