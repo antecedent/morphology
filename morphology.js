@@ -1,21 +1,22 @@
 Morphology = {
     leadingPunctuation: /^[!"#$%&\'()*+,-./:;<=>?@\[\\\]\^_`{|}~—‘’“”¿¡«»-]*/,
     trailingPunctuation: /[!"#$%&\'()*+,-./:;<=>?@\[\\\]\^_`{|}~—‘’“”¿¡«»-]*$/,
-    preferredMorphemeLength: 2,
-    numSalientSubstrings: 1000,
-    minCommutationStrength: 50,
+    preferredMorphemeLength: 3,
+    numSalientSubstrings: 5000,
+    minCommutationStrength: 100,
     minEdgeStrength: 1,
     firstPassSquashingFactor: 50,
-    firstPassClusterCount: 100,
+    firstPassClusterCount: 50,
     secondPassSquashingFactor: 150,
     secondPassClusterCount: 50,
     edgeThresholdFactor: 5,
     pruningThreshold: 1000,
     openClassThresholdFactor: 100,
-    successorThresholdFactor: 5,
+    successorThresholdFactor: 7,
     numWordsToInvent: 10000,
-    commutationAnomalyFactor: 20,
+    commutationAnomalyFactor: 3,
     trainingSetProportion: 5,
+    maxNumPrimaryCommutations: 1000,
 
     extractWords: (text) => {
         var words = new Set;
@@ -92,6 +93,9 @@ Morphology = {
                         templates[t] = new Set;
                     }
                     templates[t].add(m);
+                    if (wordsWithBoundaries.has(t.replace('_', ''))) {
+                        templates[t].add('');
+                    }
                 }
             }
         }
@@ -113,12 +117,12 @@ Morphology = {
         var result = [];
         for (var key of Object.keys(commutations)) {
             [m1, m2] = key.split(':');
-            if (commutations[key].size > Morphology.minCommutationStrength) {
-                result.push([commutations[key], m1, m2]);
-            }
+            result.push([commutations[key], m1, m2]);
         }
-        return result;
+        result.sort((l, r) => r[0].size - l[0].size);
+        return result.slice(0, Morphology.maxNumPrimaryCommutations);
     },
+
     refineCommutations: (commutations, words /* WITHOUT boundaries */, progressCallback) => {
         var nodes = new Set;
         var scores = {};
@@ -130,16 +134,22 @@ Morphology = {
             var minor = m1 + ':' + m2;
             nodes.add(minor);
             if (!scores.hasOwnProperty(minor)) {
-                edges[minor] = 0;
+                scores[minor] = 0;
+            } else {
+                // Duplicate
+                continue;
             }
-            edges[minor] += set.size;
+            scores[minor] += set.size;
             for (var sub1 of Morphology.getSubstrings(m1)) {
                 for (var sub2 of Morphology.getSubstrings(m2)) {
+                    if (sub2 < sub1) {
+                        [sub1, sub2] = [sub2, sub1];
+                    }
                     major = sub1 + ':' + sub2;
                     if (minor != major && m1.replace(sub1, '') == m2.replace(sub2, '')) {
                         nodes.add(major);
                         if (!scores.hasOwnProperty(major)) {
-                            edges[major] = 0;
+                            scores[major] = 0;
                         }
                         scores[major] += set.size;
                         edges.add([major, minor]);
@@ -149,7 +159,7 @@ Morphology = {
         }
         for (var c1 of new Set(nodes)) {
             for (var c2 of new Set(nodes)) {
-                var [m1, m2, m3, m4] = c1.split(':') + c2.split(':');
+                var [m1, m2, m3, m4] = c1.split(':').concat(c2.split(':'));
                 if (c1 != c2 && scores[c1] >= scores[c2] && m3.replace(m1, '') == m4.replace(m2, '')) {
                     nodes.delete(c2);
                 }
@@ -435,7 +445,7 @@ Morphology = {
         return result;
     },
 
-    renumberClusters: (clusters, numClusters) => {
+    renumberClusters: (clusters, numClusters, morphemeMapping) => {
         var translation = {};
         var result = [];
         var last = 0;
@@ -446,6 +456,12 @@ Morphology = {
         }
         for (var cluster of clusters) {
             result.push(translation[cluster]);
+        }
+        for (var boundary of ['⋊', '⋉']) {
+            var m = morphemeMapping[boundary];
+            if (result.filter((c) => c == result[m]).length > 1) {
+                result[m] = last++;
+            }
         }
         return [result, last];
     },
@@ -556,8 +572,12 @@ Morphology = {
     },
 
     inventWords: (numClusters, clusterInfo, initial, final, words, progressCallback) => {
+        var meanLength = Array.from(words).map((w) => w.length).reduce((a, x) => a + x, 0) / words.size;
         var result = new Set;
         var invent = (prefix, state) => {
+            if (prefix.length > 2 * meanLength) {
+                return;
+            }
             if (state == final && prefix.length > 0 && !words.has(prefix)) {
                 result.add(prefix);
                 return;

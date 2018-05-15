@@ -59,7 +59,7 @@ onmessage = (e) => {
         var firstPassClusters = task('doFirstPassClustering', () => Morphology.doFirstPassClustering(adjacencyMatrix));
         var secondPassClusters = task('doSecondPassClustering', () => Morphology.doSecondPassClustering(adjacencyMatrix, firstPassClusters));
         var numClusters;
-        [secondPassClusters, numClusters] = task('renumberClusters', () => Morphology.renumberClusters(secondPassClusters, Morphology.secondPassClusterCount));
+        [secondPassClusters, numClusters] = task('renumberClusters', () => Morphology.renumberClusters(secondPassClusters, Morphology.secondPassClusterCount, morphemeMapping));
         var morphemeTypes = task('guessClusterTypes', () => Morphology.guessClusterTypes(numClusters, secondPassClusters, adjacencyMatrix, morphemeMapping));
         var layout = task('generateLayout', () => Morphology.generateLayout(Object.keys(morphemeMapping).length, secondPassClusters, numClusters, e.data.canvasWidth, e.data.canvasHeight, e.data.vertexRadius, progress('generateLayout')));
         var edges = task('getRelevantEdges', () => Morphology.getRelevantEdges(adjacencyMatrix, morphemeMapping, progress('getRelevantEdges')));
