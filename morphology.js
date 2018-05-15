@@ -1,7 +1,7 @@
 Morphology = {
     leadingPunctuation: /^[!"#$%&\'()*+,-./:;<=>?@\[\\\]\^_`{|}~—‘’“”¿¡«»-]*/,
     trailingPunctuation: /[!"#$%&\'()*+,-./:;<=>?@\[\\\]\^_`{|}~—‘’“”¿¡«»-]*$/,
-    preferredMorphemeLength: 3,
+    preferredMorphemeLength: 2,
     numSalientSubstrings: 1000,
     minCommutationStrength: 50,
     minEdgeStrength: 1,
