@@ -2,8 +2,8 @@ Morphology = {
     leadingPunctuation: /^[!"#$%&\'()*+,-./:;<=>?@\[\\\]\^_`{|}~—‘’“”¿¡«»-]*/,
     trailingPunctuation: /[!"#$%&\'()*+,-./:;<=>?@\[\\\]\^_`{|}~—‘’“”¿¡«»-]*$/,
     preferredMorphemeLength: 3,
-    numSalientSubstrings: 1000,
-    minCommutationStrength: 100,
+    numSalientSubstrings: 3000,
+    minCommutationStrength: 30,
     minEdgeStrength: 1,
     firstPassSquashingFactor: 50,
     firstPassClusterCount: 50,
@@ -12,9 +12,9 @@ Morphology = {
     edgeThresholdFactor: 5,
     pruningThreshold: 1000,
     openClassThresholdFactor: 100,
-    successorThresholdFactor: 7,
+    successorThresholdFactor: 8,
     numWordsToInvent: 10000,
-    commutationAnomalyFactor: 3,
+    commutationAnomalyFactor: 10,
     trainingSetProportion: 5,
     maxNumPrimaryCommutations: 1000,
 
@@ -244,48 +244,49 @@ Morphology = {
     },
 
     getBigrams: (commutations) => {
-        var preResult = {};
+        var byWord = {};
         for (var [set, m1, m2] of commutations) {
             for (var t of set) {
-                var [left, right] = t.split('_');
-                var additions = [];
-                if (m1 == '') {
-                    additions = [
-                        ['⋊', left], [left, right], [right, '⋉'],
-                        ['⋊', left], [left, m2], [m2, right], [right, '⋉']
-                    ];
-                } else {
-                    additions = [
-                        ['⋊', left], [left, m1], [m1, right], [right, '⋉'],
-                        ['⋊', left], [left, m2], [m2, right], [right, '⋉']
-                    ];
-                }
-                if (left == '') {
-                    additions.push(['⋊', m1]);
-                    additions.push(['⋊', m2]);
-                }
-                if (right == '') {
-                    additions.push([m1, '⋉']);
-                    additions.push([m2, '⋉']);
-                    if (m1 == '') {
-                        additions.push([left, '⋉']);
+                for (var m of [m1, m2]) {
+                    var word = t.replace('_', m);
+                    if (!byWord.hasOwnProperty(word)) {
+                        byWord[word] = new Set;
+                    }
+                    if (m != '') {
+                        byWord[word].add(m);
                     }
                 }
-                var additionSet = new Set;
-                for (var [a, b] of additions) {
-                    if (a == '' || b == '') {
-                        continue;
-                    }
-                    var key = a + ':' + b;
+            }
+        }
+        var preResult = {};
+        for (var word of Object.keys(byWord)) {
+            var morphemes = Array.from(byWord[word]).concat(['⋊', '⋉']);
+            var w = '⋊' + word + '⋉';
+            morphemes.sort((m1, m2) => w.indexOf(m1) - w.indexOf(m2));
+            var last = null;
+            var numReversals = 0;
+            for (var i = 0; i < morphemes.length; i++) {
+                if (numReversals > 5) {
+                    break;
+                }
+                var m = morphemes[i];
+                if (!w.startsWith(m)) {
+                    m = w.substring(0, w.indexOf(morphemes[i]));
+                    i--;
+                    numReversals++;
+                }
+                if (m == '') {
+                    break;
+                }
+                w = w.substring(m.length);
+                if (last != null) {
+                    key = last + ':' + m;
                     if (!preResult.hasOwnProperty(key)) {
                         preResult[key] = new Set;
                     }
-                    for (var w of [t.replace('_', m1), t.replace('_', m2)]) {
-                        if (('⋊' + w + '⋉').includes(a + b)) {
-                            preResult[key].add(w);
-                        }
-                    }
+                    preResult[key].add(word);
                 }
+                last = m;
             }
         }
         var result = [];
@@ -572,10 +573,17 @@ Morphology = {
     },
 
     inventWords: (numClusters, clusterInfo, initial, final, words, progressCallback) => {
-        var meanLength = Array.from(words).map((w) => w.length).reduce((a, x) => a + x, 0) / words.size;
         var result = new Set;
-        var invent = (prefix, state) => {
-            if (prefix.length > 2 * meanLength) {
+        var shuffle = (array) => {
+            var result = Array.from(array);
+            for (var i = array.length - 1; i > 0; i--) {
+                var j = Math.floor(Math.random() * (i + 1));
+                [result[i], result[j]] = [result[j], result[i]];
+            }
+            return result;
+        };
+        var invent = (prefix, state, depth, depthLimit) => {
+            if (depth > depthLimit) {
                 return;
             }
             if (state == final && prefix.length > 0 && !words.has(prefix)) {
@@ -586,14 +594,18 @@ Morphology = {
             if (result.size >= Morphology.numWordsToInvent) {
                 return;
             }
-            for (var successor of clusterInfo[state].successors) {
-                for (var morpheme of clusterInfo[state].morphemes) {
-                    invent(prefix + morpheme, successor);
+            for (var newDepthLimit = depth + 1; newDepthLimit <= depthLimit; newDepthLimit++) {
+                for (var successor of shuffle(clusterInfo[state].successors)) {
+                    for (var morpheme of shuffle(clusterInfo[state].morphemes)) {
+                        invent(prefix + morpheme, successor, depth + 1, newDepthLimit);
+                    }
                 }
             }
         };
-        for (var next of clusterInfo[initial].successors) {
-            invent('', next);
+        for (var depthLimit = 1; depthLimit <= 5; depthLimit++) {
+            for (var next of shuffle(clusterInfo[initial].successors)) {
+                invent('', next, 0, depthLimit);
+            }
         }
         result = Array.from(result);
         result.sort();
