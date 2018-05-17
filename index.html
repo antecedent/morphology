@@ -122,7 +122,7 @@
                 }
                 var k = 0;
                 for (var image of images) {
-                    var hue = parseInt(330 * k / results.renumberClusters[1]);
+                    var hue = parseInt(33 * (k % 10));
                     var div = $('<div class="cluster">').appendTo($('.results-section'));
                     var img = $('<img>').attr('src', image).attr('width', 200).attr('height', 200);
                     var a = $('<a>').attr('href', image).append(img).appendTo(div);
@@ -200,7 +200,19 @@
                 var element = document.createElement('a');
                 var blob = new Blob([results.segment[1]], {type: 'text/plain'});
                 element.setAttribute('href', URL.createObjectURL(blob));
-                element.setAttribute('download', 'segments.txt');
+                element.setAttribute('download', 'segments-' + (new Date).toISOString().replace(/[^\d]/g, '') + '.txt');
+                element.style.display = 'none';
+                document.body.appendChild(element);
+                element.click();
+                document.body.removeChild(element);
+                return false;
+            });
+
+            $('.download-results').click(function() {
+                var element = document.createElement('a');
+                var blob = new Blob([JSON.stringify(results)], {type: 'text/plain'});
+                element.setAttribute('href', URL.createObjectURL(blob));
+                element.setAttribute('download', 'results-' + (new Date).toISOString().replace(/[^\d]/g, '') + '.json');
                 element.style.display = 'none';
                 document.body.appendChild(element);
                 element.click();
@@ -368,6 +380,7 @@
     <section class="results-section" style="display: none;">
         <h2>Rezultatai</h2>
         <p><a href="#" class="download-segments" target="_blank">Atsisiųsti segmentuotą tekstą</a></p>
+        <p><a href="#" class="download-results" target="_blank">Išsaugoti analizės rezultatus vėlesnei peržiūrai</a></p>
         <p><a href="" target="_blank">Analizuoti kitą tekstą (naujame skirtuke)</a></p>
         <div class="divergence-notice" style="display: none;">
             Naujadarų generavimas nedavė rezultatų. Gali reikėti pasirinkti ilgesnį tekstą arba tiesiog paleisti algoritmą dar kartą.

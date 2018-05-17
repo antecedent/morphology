@@ -64,7 +64,7 @@ $(() => {
                 if (layout[i] == null) {
                     continue;
                 }
-                var hue = parseInt(330 * clusters[i] / numClusters);
+                var hue = parseInt(33 * (clusters[i] % 10));
                 ctx.fillStyle = 'hsl(' + hue + ', 100%, 50%)';
                 ctx.beginPath();
                 ctx.arc(layout[i].x, layout[i].y, vertexRadius, 0, 2 * Math.PI);
