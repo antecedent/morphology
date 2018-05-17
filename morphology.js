@@ -610,5 +610,44 @@ Morphology = {
         result = Array.from(result);
         result.sort();
         return result;
+    },
+
+    segment: (text, words, clusters, clusterInfo, morphemeMapping, progressCallback) => {
+        var run = (suffix, state) => {
+            if (suffix == '') {
+                return [];
+            }
+            for (var i = 1; i <= suffix.length; i++) {
+                var substring = suffix.substring(0, i);
+                if (morphemeMapping.hasOwnProperty(substring)) {
+                    var next = clusters[morphemeMapping[substring]];
+                    if (clusterInfo[state].successors.includes(next)) {
+                        var subResult = run(suffix.substring(substring.length), next);
+                        if (subResult !== null) {
+                            return [substring].concat(subResult);
+                        }
+                    }
+                }
+            }
+            return null;
+        };
+        var result = {};
+        var k = 0;
+        text = text.replace(/-/g, ' ');
+        for (var word of words) {
+            progressCallback(k++, words.size);
+            result[word] = run(word.substring(1), clusters[morphemeMapping['⋊']]);
+            if (result[word] !== null) {
+                result[word] = result[word].slice(0, -1);
+            }
+            try {
+                if (result[word] !== null && result[word].length > 1) {
+                    text = text.replace(new RegExp('([^\\w\']|^)(' + word.substring(1, word.length - 1) + ')([^\\w\']|$)', 'ig'), '$1' + result[word].join('-') + '$3');
+                }
+            } catch (error) {
+                // Ignore regex errors
+            }
+        }
+        return [result, text];
     }
 };
