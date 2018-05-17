@@ -52,19 +52,35 @@ onmessage = (e) => {
         var wordsWithBoundaries = task('addBoundaryChars', () => Morphology.addBoundaryChars(words));
         var substrings = task('getSalientSubstrings', () => Morphology.getSalientSubstrings(wordsWithBoundaries));
         var commutations = task('commute', () => Morphology.commute(substrings, wordsWithBoundaries, progress('commute')));
-        var commutations = task('refineCommutations', () => Morphology.refineCommutations(commutations, words, progress('refineCommutations')));
+        commutations = task('refineCommutations', () => Morphology.refineCommutations(commutations, words, progress('refineCommutations')));
         var bigrams = task('getBigrams', () => Morphology.getBigrams(commutations));
         var morphemes = task('getMorphemes', () => Morphology.getMorphemes(bigrams));
         var [adjacencyMatrix, morphemeMapping] = task('getAdjacencyMatrix', () => Morphology.getAdjacencyMatrix(bigrams, morphemes, trainingSet.toLowerCase()));
-        var firstPassClusters = task('doFirstPassClustering', () => Morphology.doFirstPassClustering(adjacencyMatrix));
-        var secondPassClusters = task('doSecondPassClustering', () => Morphology.doSecondPassClustering(adjacencyMatrix, firstPassClusters));
-        var numClusters;
-        [secondPassClusters, numClusters] = task('renumberClusters', () => Morphology.renumberClusters(secondPassClusters, Morphology.secondPassClusterCount, morphemeMapping));
-        var morphemeTypes = task('guessClusterTypes', () => Morphology.guessClusterTypes(numClusters, secondPassClusters, adjacencyMatrix, morphemeMapping));
+        var score = 0;
+        var secondPassClusters, numClusters, morphemeTypes, inventedWords;
+        for (var i = 1; i <= e.data.parameters.numClusteringIterations; i++) {
+            var _firstPassClusters = task('doFirstPassClustering.' + i, () => Morphology.doFirstPassClustering(adjacencyMatrix));
+            var _secondPassClusters = task('doSecondPassClustering.' + i, () => Morphology.doSecondPassClustering(adjacencyMatrix, _firstPassClusters));
+            var _numClusters;
+            [_secondPassClusters, _numClusters] = task('renumberClusters.' + i, () => Morphology.renumberClusters(_secondPassClusters, Morphology.secondPassClusterCount, morphemeMapping));
+            var _morphemeTypes = task('guessClusterTypes.' + i, () => Morphology.guessClusterTypes(_numClusters, _secondPassClusters, adjacencyMatrix, morphemeMapping));
+            var _inventedWords = task('inventWords.' + i, () => Morphology.inventWords(_numClusters, _morphemeTypes, _secondPassClusters[morphemeMapping['⋊']], _secondPassClusters[morphemeMapping['⋉']], words, progress('inventWords.' + i)));
+            var _score = _inventedWords.filter((w) => validationWords.has(w)).length / Morphology.numWordsToInvent;
+            task('score.' + i, () => _score);
+            if (_score >= score) {
+                secondPassClusters = _secondPassClusters;
+                numClusters = _numClusters;
+                morphemeTypes = _morphemeTypes;
+                inventedWords = _inventedWords;
+                score = _score;
+            }
+        }
+        task('renumberClusters', () => [secondPassClusters, numClusters]);
+        task('guessClusterTypes', () => morphemeTypes);
+        task('inventWords', () => inventedWords);
         var layout = task('generateLayout', () => Morphology.generateLayout(Object.keys(morphemeMapping).length, secondPassClusters, numClusters, e.data.canvasWidth, e.data.canvasHeight, e.data.vertexRadius, progress('generateLayout')));
         var edges = task('getRelevantEdges', () => Morphology.getRelevantEdges(adjacencyMatrix, morphemeMapping, progress('getRelevantEdges')));
         task('segment', () => Morphology.segment(e.data.text, wordsWithBoundaries, secondPassClusters, morphemeTypes, morphemeMapping, progress('segment')));
-        task('inventWords', () => Morphology.inventWords(numClusters, morphemeTypes, secondPassClusters[morphemeMapping['⋊']], secondPassClusters[morphemeMapping['⋉']], words, progress('inventWords')));
     } catch (error) {
         // Already handled by task()
     }

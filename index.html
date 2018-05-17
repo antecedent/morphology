@@ -137,12 +137,17 @@
             };
 
             var run = (text) => {
+                var iterator = $('.iteration');
+                for (var i = parseInt($('.parameters-section input[data-key=numClusteringIterations]').val()); i > 0; i--) {
+                    $(iterator[0].outerHTML.replace(new RegExp('{' + iterator.data('counter') + '}', 'g'), i)).insertAfter(iterator);
+                }
+                iterator.detach();
                 $('.texts-section, .parameters-section').hide();
                 var worker = new Worker('worker.js');
                 $('.tasks li').removeClass();
                 $('.progress').text('0');
                 worker.onmessage = (e) => {
-                    var element = $('.tasks li[data-task=?]'.replace('?', e.data.task));
+                    var element = $('.tasks li[data-task="?"]'.replace('?', e.data.task));
                     element.removeClass().addClass(e.data.state);
                     if (e.data.state == 'progress') {
                         element.find('.progress').text(e.data.progress);
@@ -150,7 +155,7 @@
                     if (e.data.state == 'completed') {
                         element.find('.progress').text('100');
                         results[e.data.task] = e.data.result;
-                        if (e.data.task == 'inventWords') {
+                        if (e.data.task == 'segment') {
                             showResults();
                         }
                     }
@@ -288,6 +293,10 @@
                 <td><input readonly value="N"></td>
             </tr>
             <tr>
+                <td>Grupavimo bandymų skaičius</td>
+                <td><input type="number" data-key="numClusteringIterations" value="5"></td>
+            </tr>
+            <tr>
                 <td>Įsimintinų raidžių samplaikų skaičius</td>
                 <td><input data-key="numSalientSubstrings" value="3000"></td>
             </tr>
@@ -321,7 +330,7 @@
             </tr>
             <tr>
                 <td>Generuotinų naujadarų skaičius</td>
-                <td><input type="number" data-key="numWordsToInvent" value="10000"></td>
+                <td><input data-key="numWordsToInvent" value="10000"></td>
             </tr>
             <!-- <tr>
                 <td>Klasės uždarumo slenksčio koeficientas</td>
@@ -340,14 +349,19 @@
             <li data-task="getBigrams">Sužymėti galimų morfemų kaimynystę</li>
             <li data-task="getMorphemes">Paskelbti kandidatines morfemas</li>
             <li data-task="getAdjacencyMatrix">Sudaryti kaimynystės matricą</li>
-            <li data-task="doFirstPassClustering">Sugrupuoti morfemas su panašiomis kaimynystės savybėmis</li>
-            <li data-task="doSecondPassClustering">Patikslinti morfemų grupavimą</li>
-            <li data-task="renumberClusters">Atnaujinti grupių numeraciją</li>
-            <li data-task="guessClusterTypes">Nustatyti morfemų grupių tipus</li>
+            <li class="iteration" data-counter="i">
+                <strong>{i} bandymas grupuoti kandidatines morfemas:</strong>
+                <ul>
+                    <li data-task="doFirstPassClustering.{i}">Sugrupuoti morfemas su panašiomis kaimynystės savybėmis</li>
+                    <li data-task="doSecondPassClustering.{i}">Patikslinti morfemų grupavimą</li>
+                    <li data-task="renumberClusters.{i}">Atnaujinti grupių numeraciją</li>
+                    <li data-task="guessClusterTypes.{i}">Nustatyti morfemų grupių tipus</li>
+                    <li data-task="inventWords.{i}">Kurti naujadarus (<span class="progress">0</span>%)</li>
+                </ul>
+            </li>
             <li data-task="generateLayout">Išdėstyti kaimynystės schemą plokštumoje (<span class="progress">0</span>%)</li>
             <li data-task="getRelevantEdges">Išrinkti rodykles iš kaimynystės matricos (<span class="progress">0</span>%)</li>
             <li data-task="segment">Segmentuoti žodžius (<span class="progress">0</span>%)</li>
-            <li data-task="inventWords">Kurti naujadarus (<span class="progress">0</span>%)</li>
             <li data-task="render">Nupiešti kaimynystės diagramas</li>
         </ul>
     </section>
