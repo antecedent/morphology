@@ -187,7 +187,8 @@
 
             $('.download-segments').click(function() {
                 var element = document.createElement('a');
-                element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(results.segment[1]));
+                var blob = new Blob([results.segment[1]], {type: 'text/plain'});
+                element.setAttribute('href', URL.createObjectURL(blob));
                 element.setAttribute('download', 'segments.txt');
                 element.style.display = 'none';
                 document.body.appendChild(element);
