@@ -10,13 +10,13 @@ Morphology = {
     secondPassSquashingFactor: 150,
     secondPassClusterCount: 50,
     edgeThresholdFactor: 5,
-    pruningThreshold: 1000,
+    pruningThreshold: 5000,
     openClassThresholdFactor: 100,
     successorThresholdFactor: 8,
     numWordsToInvent: 10000,
     commutationAnomalyFactor: 10,
     trainingSetProportion: 5,
-    maxNumPrimaryCommutations: 1000,
+    maxNumPrimaryCommutations: 5000,
 
     extractWords: (text) => {
         var words = new Set;

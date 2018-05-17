@@ -159,9 +159,15 @@
                         console.log(e.data.stack);
                     }
                 };
-                var parameters = {};
+                window.parameters = {};
+                var max = Math.max;
+                var min = Math.min;
+                var N = text.split(/\s+/).length;
                 $('.parameters-section input').each(function () {
-                    parameters[$(this).data('key')] = parseInt($(this).val());
+                    parameters[$(this).data('key')] = parseInt(eval($(this).val()));
+                    if (isNaN(parameters[$(this).data('key')])) {
+                        return;
+                    }
                 });
                 worker.postMessage({
                     text: text,
@@ -233,6 +239,13 @@
                 </ul>
             </dd>
 
+            <dt>Latvių kalba</dt>
+            <dd>
+                <ul class="texts">
+                    <li><a href="#" data-src="latvian.txt">30 000 sakinių tekstynas iš naujienų straipsnių (Leipzigo universitetas)</a></li>
+                </ul>
+            </dd>
+
             <dt>Lietuvių kalba</dt>
             <dd>
                 <ul class="texts">
@@ -244,6 +257,7 @@
             <dd>
                 <ul class="texts">
                     <li><a href="#" data-src="14741-0.txt">Гавриил Романович Державин. <em>Духовные оды</em></a></li>
+                    <li><a href="#" data-src="russian.txt">30 000 sakinių tekstynas iš naujienų straipsnių (Leipzigo universitetas)</a></li>
                 </ul>
             </dd>
 
@@ -270,36 +284,40 @@
                 <td><input type="number" data-key="edgeThresholdFactor" value="5"></td>
             </tr> -->
             <tr>
+                <td>Žodžių skaičius tekste</td>
+                <td><input readonly value="N"></td>
+            </tr>
+            <tr>
                 <td>Įsimintinų raidžių samplaikų skaičius</td>
-                <td><input type="number" data-key="numSalientSubstrings" value="3000"></td>
+                <td><input data-key="numSalientSubstrings" value="3000"></td>
             </tr>
             <tr>
                 <td>Idealus įsimintinos samplaikos ilgis</td>
-                <td><input type="number" data-key="preferredMorphemeLength" value="3"></td>
+                <td><input data-key="preferredMorphemeLength" value="3"></td>
             </tr>
             <tr>
                 <td>Minimalus komutaciją įrodančių žodžių skaičius</td>
-                <td><input type="number" data-key="minCommutationStrength" value="30"></td>
+                <td><input data-key="minCommutationStrength" value="N / 5000"></td>
             </tr>
             <tr>
                 <td>Pirmojo grupavimo grupių skaičius</td>
-                <td><input type="number" data-key="firstPassClusterCount" value="50"></td>
+                <td><input data-key="firstPassClusterCount" value="N / 3000"></td>
             </tr>
             <tr>
                 <td>Antrojo grupavimo grupių skaičius</td>
-                <td><input type="number" data-key="secondPassClusterCount" value="50"></td>
+                <td><input data-key="secondPassClusterCount" value="N / 3000"></td>
             </tr>
             <tr>
                 <td>Maksimalus aktualių morfemų skaičius</td>
-                <td><input type="number" data-key="pruningThreshold" value="1000"></td>
+                <td><input data-key="pruningThreshold" value="2000"></td>
             </tr>
             <tr>
                 <td>Morfotaktinių ryšių įtraukties koeficientas</td>
-                <td><input type="number" data-key="successorThresholdFactor" value="8"></td>
+                <td><input data-key="successorThresholdFactor" value="min(5, N / 20000)"></td>
             </tr>
             <tr>
-                <td>Apmokymui skirta teksto proporcija (N : 1)</td>
-                <td><input type="number" data-key="trainingSetProportion" value="5"></td>
+                <td>Apmokymu i skirta teksto proporcija (M : 1)</td>
+                <td><input data-key="trainingSetProportion" value="max(1, 500000 / N)"></td>
             </tr>
             <tr>
                 <td>Generuotinų naujadarų skaičius</td>
