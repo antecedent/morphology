@@ -4,13 +4,14 @@ $(() => {
         width: 600,
         height: 600,
 
-        createImages: (clusters, morphemeMapping, edges, layout) => {
+        createImages: (clusters, morphemeMapping, edges, layout, progressCallback) => {
             var numClusters = 0;
             var result = [];
             for (var c of clusters) {
                 numClusters = Math.max(numClusters, c + 1);
             }
             for (var i = 0; i < numClusters; i++) {
+                progressCallback(i, numClusters);
                 var canvas = Visualization.createHiDPICanvas(Visualization.width, Visualization.height);
                 Visualization.drawClusterRelations(i, clusters, morphemeMapping, edges, layout, canvas, Visualization.vertexRadius);
                 result.push(canvas.toDataURL('ímage/png'));

@@ -97,7 +97,8 @@
                     results.renumberClusters[0],
                     results.getAdjacencyMatrix[1],
                     results.getRelevantEdges,
-                    results.generateLayout
+                    results.generateLayout,
+                    (progress, total) => $('.tasks li[data-task=render] .progress').text(parseInt(100 * progress / total))
                 );
                 $('.tasks li[data-task=render]').removeClass().addClass('completed');
                 $('section:not(.results-section)').hide();
@@ -335,11 +336,11 @@
             </tr>
             <tr>
                 <td>Pirmojo grupavimo grupių skaičius</td>
-                <td><input data-key="firstPassClusterCount" value="N / 200"></td>
+                <td><input data-key="firstPassClusterCount" value="N / 400"></td>
             </tr>
             <tr>
                 <td>Antrojo grupavimo grupių skaičius</td>
-                <td><input data-key="secondPassClusterCount" value="N / 200"></td>
+                <td><input data-key="secondPassClusterCount" value="N / 400"></td>
             </tr>
             <tr>
                 <td>Maksimalus aktualių morfemų skaičius</td>
@@ -350,7 +351,7 @@
                 <td><input data-key="successorThresholdFactor" value="max(5, N / 5000)"></td>
             </tr>
             <tr>
-                <td>Apmokymu i skirta teksto proporcija (M : 1)</td>
+                <td>Apmokymui skirta teksto proporcija (M : 1)</td>
                 <td><input data-key="trainingSetProportion" value="1"></td>
             </tr>
             <tr>
@@ -387,7 +388,7 @@
             <li data-task="generateLayout">Išdėstyti kaimynystės schemą plokštumoje (<span class="progress">0</span>%)</li>
             <li data-task="getRelevantEdges">Išrinkti rodykles iš kaimynystės matricos (<span class="progress">0</span>%)</li>
             <li data-task="segment">Segmentuoti žodžius (<span class="progress">0</span>%)</li>
-            <li data-task="render">Nupiešti kaimynystės diagramas</li>
+            <li data-task="render">Nupiešti kaimynystės diagramas (<span class="progress">0</span>%)</li>
         </ul>
     </section>
     <section class="results-section" style="display: none;">
