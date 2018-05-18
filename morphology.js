@@ -263,12 +263,11 @@ Morphology = {
         for (var word of Object.keys(byWord)) {
             byWord[word].add(-1);
             byWord[word].add(0);
-            byWord[word].add(word.length);
+            byWord[word].add(word.length + 1);
             var offsets = Array.from(byWord[word]).map((x) => x + 1);
             offsets.sort((l, r) => l - r);
             var last = null;
             var w = '⋊' + word + '⋉';
-            console.log(w, offsets);
             for (var i = 1; i < offsets.length; i++) {
                 var m = w.substring(offsets[i - 1], offsets[i]);
                 if (last != null) {
