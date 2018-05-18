@@ -84,9 +84,10 @@ Morphology = {
     commute: (substrings, wordsWithBoundaries, progressCallback) => {
         var templates = {};
         var progress = 0;
+        var [prefixTree, wordArray] = Morphology.makePrefixTree(wordsWithBoundaries);
         for (var m of substrings) {
             progressCallback(progress++, substrings.length);
-            for (var word of wordsWithBoundaries) {
+            for (var word of Morphology.searchPrefixTree(prefixTree, wordArray, m).map((i) => wordArray[i])) {
                 if (word.includes(m)) {
                     t = word.replace(m, '_');
                     if (!templates.hasOwnProperty(t)) {
@@ -157,7 +158,13 @@ Morphology = {
                 }
             }
         }
+        var total = nodes.size / 2;
+        var k = 0;
         for (var c1 of new Set(nodes)) {
+            if (!nodes.has(c1)) {
+                continue;
+            }
+            progressCallback(Math.min(k++, total), total);
             for (var c2 of new Set(nodes)) {
                 var [m1, m2, m3, m4] = c1.split(':').concat(c2.split(':'));
                 if (c1 != c2 && scores[c1] >= scores[c2] && m3.replace(m1, '') == m4.replace(m2, '')) {
@@ -167,11 +174,24 @@ Morphology = {
         }
         var preResult = {};
         var progress = 0;
+        var [prefixTree, wordArray] = Morphology.makePrefixTree(words);
         for (var c of nodes) {
-            progressCallback(progress++, nodes.size);
             var [m1, m2] = c.split(':');
             var hits = {};
-            for (var word of words) {
+            var relevantWords = Morphology.searchPrefixTree(prefixTree, wordArray, m2);
+            if (m1 != '') {
+                var other = Morphology.searchPrefixTree(prefixTree, wordArray, m1);
+                //relevantWords = relevantWords.filter((w) => other.includes(w));
+            }
+            relevantWords = new Set(relevantWords.map((w) => wordArray[w]));
+            if (m1 == '') {
+                for (var r of Array.from(relevantWords)) {
+                    if (words.has(r.replace(m2, ''))) {
+                        relevantWords.add(r.replace(m2, ''));
+                    }
+                }
+            }
+            for (var word of relevantWords) {
                 for (var m of [m1, m2]) {
                     var key = word.replace(m, '');
                     if (!hits.hasOwnProperty(key)) {
@@ -263,6 +283,7 @@ Morphology = {
         for (var word of Object.keys(byWord)) {
             byWord[word].add(-1);
             byWord[word].add(0);
+            byWord[word].add(word.length);
             byWord[word].add(word.length + 1);
             var offsets = Array.from(byWord[word]).map((x) => x + 1);
             offsets.sort((l, r) => l - r);
@@ -626,7 +647,7 @@ Morphology = {
         var k = 0;
         text = text.replace(/-/g, ' ');
         for (var word of words) {
-            progressCallback(k++, words.size);
+            progressCallback(k, words.size);
             result[word] = run(word.substring(1), clusters[morphemeMapping['⋊']]);
             if (result[word] !== null) {
                 result[word] = result[word].slice(0, -1);
@@ -640,6 +661,39 @@ Morphology = {
             }
         }
         return [result, text];
+    },
+
+    makePrefixTree: (words) => {
+        var wordArray = Array.from(words);
+        var result = {items: []};
+        for (var i = 0; i < wordArray.length; i++) {
+            for (var j = 0; j < wordArray[i].length; j++) {
+                var suffix = wordArray[i].substring(j);
+                var node = result;
+                for (var k = 0; k < suffix.length; k++) {
+                    var letter = suffix[k];
+                    if (!node.hasOwnProperty(letter)) {
+                        node[letter] = {items: []};
+                    }
+                    node[letter].items.push(i);
+                    node = node[letter];
+                }
+            }
+        }
+        return [result, wordArray];
+    },
+
+    searchPrefixTree: (tree, wordArray, substring) => {
+        var node = tree;
+        for (var i = 0; i < substring.length; i++) {
+            var letter = substring[i];
+            if (node.hasOwnProperty(letter)) {
+                node = node[letter];
+            } else {
+                return [];
+            }
+        }
+        return node.items;
     },
 
     boost: () => {

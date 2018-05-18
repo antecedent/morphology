@@ -91,7 +91,7 @@
         $(() => {
             window.results = {};
 
-            var showResults = () => {
+            window.showResults = () => {
                 $('.tasks li[data-task=render]').addClass('progress');
                 var images = Visualization.createImages(
                     results.renumberClusters[0],
