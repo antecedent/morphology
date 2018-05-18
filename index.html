@@ -93,12 +93,23 @@
 
             window.showResults = () => {
                 $('.tasks li[data-task=render]').addClass('progress');
-                var images = Visualization.createImages(
+                var k = 0;
+                Visualization.createImages(
                     results.renumberClusters[0],
                     results.getAdjacencyMatrix[1],
                     results.getRelevantEdges,
                     results.generateLayout,
-                    (progress, total) => $('.tasks li[data-task=render] .progress').text(parseInt(100 * progress / total))
+                    (image) => {
+                        var hue = parseInt(33 * (k % 10));
+                        var div = $('<div class="cluster">').appendTo($('.results-section'));
+                        var img = $('<img>').attr('src', image).attr('width', 200).attr('height', 200);
+                        var a = $('<a>').attr('href', image).append(img).appendTo(div);
+                        new Luminous(a[0]);
+                        var h3 = $('<h3>' + (k + 1) + ' grupė <span style="color: hsl(' + hue + ', 100%, 50%);">&bull;</span></h3>').appendTo(div);
+                        //$('<p><em>' + (results.guessClusterTypes[k].open ? 'Atvira klasė' : 'Uždara klasė') + '</em></p>').appendTo(div);
+                        var p = $('<p>' + results.guessClusterTypes[k].morphemes.join(', ') + '</p>').appendTo(div);
+                        k++;
+                    }
                 );
                 $('.tasks li[data-task=render]').removeClass().addClass('completed');
                 $('section:not(.results-section)').hide();
@@ -127,20 +138,6 @@
                 if (isNaN(percentage) || percentage == 0) {
                     $('.divergence-notice').show();
                 }
-                var k = 0;
-                for (var image of images) {
-                    var hue = parseInt(33 * (k % 10));
-                    var div = $('<div class="cluster">').appendTo($('.results-section'));
-                    var img = $('<img>').attr('src', image).attr('width', 200).attr('height', 200);
-                    var a = $('<a>').attr('href', image).append(img).appendTo(div);
-                    var h3 = $('<h3>' + (k + 1) + ' grupė <span style="color: hsl(' + hue + ', 100%, 50%);">&bull;</span></h3>').appendTo(div);
-                    //$('<p><em>' + (results.guessClusterTypes[k].open ? 'Atvira klasė' : 'Uždara klasė') + '</em></p>').appendTo(div);
-                    var p = $('<p>' + results.guessClusterTypes[k].morphemes.join(', ') + '</p>').appendTo(div);
-                    k++;
-                }
-                for (var link of document.querySelectorAll('.cluster a, .morphotactics a')) {
-                    new Luminous(link);
-                }
             };
 
             var run = (text) => {
@@ -161,7 +158,7 @@
                     }
                     if (e.data.state == 'completed') {
                         element.find('.progress').text('100');
-                        results[e.data.task] = e.data.result;
+                        results[e.data.task.replace(/\.\d+$/, '')] = e.data.result;
                         if (e.data.task == 'segment') {
                             showResults();
                         }
@@ -283,7 +280,7 @@
                     <li>
                         <a href="#" data-src="latvian.txt">30 000 sakinių tekstynas iš naujienų straipsnių (Leipzigo universitetas)</a>
                         <ul>
-                            <li><a href="#" data-src="results-20180518125916687.json">Gatava analizė (3,93% generavimo tikslumas; paspaudę palaukite)</a></li>
+                            <li><a href="#" data-src="results-20180518125916687.json">Gatava analizė (3,93% generavimo tikslumas)</a></li>
                         </ul>
                     </li>
                 </ul>
@@ -293,7 +290,12 @@
             <dd>
                 <ul class="texts">
                     <li><a href="#" data-src="lt.txt">Vincas Mykolaitis-Putinas. <em>Altorių šešėly</em> (ištrauka)</a></li>
-                    <li><a href="#" data-src="lithuanian.txt">100 000 sakinių tekstynas iš naujienų straipsnių (Leipzigo universitetas)</a></li>
+                    <li>
+                        <a href="#" data-src="lithuanian.txt">100 000 sakinių tekstynas iš naujienų straipsnių (Leipzigo universitetas)</a>
+                        <ul>
+                            <li><a href="#" data-src="results-20180518174312574.json">Gatava analizė (3,69% generavimo tikslumas)</a></li>
+                        </ul>
+                    </li>
                 </ul>
             </dd>
 
@@ -304,7 +306,7 @@
                     <li>
                         <a href="#" data-src="russian.txt">30 000 sakinių tekstynas iš naujienų straipsnių (Leipzigo universitetas)</a>
                         <ul>
-                            <li><a href="#" data-src="results-20180518132643927.json">Gatava analizė (3,18% generavimo tikslumas; paspaudę palaukite)</a></li>
+                            <li><a href="#" data-src="results-20180518132643927.json">Gatava analizė (3,18% generavimo tikslumas)</a></li>
                         </ul>
                     </li>
                 </ul>
@@ -350,15 +352,15 @@
             </tr>
             <tr>
                 <td>Minimalus komutaciją įrodančių žodžių skaičius</td>
-                <td><input data-key="minCommutationStrength" value="N / 600"></td>
+                <td><input data-key="minCommutationStrength" value="N / 300"></td>
             </tr>
             <tr>
                 <td>Pirmojo grupavimo grupių skaičius</td>
-                <td><input data-key="firstPassClusterCount" value="N / 400"></td>
+                <td><input data-key="firstPassClusterCount" value="N / 1000"></td>
             </tr>
             <tr>
                 <td>Antrojo grupavimo grupių skaičius</td>
-                <td><input data-key="secondPassClusterCount" value="N / 400"></td>
+                <td><input data-key="secondPassClusterCount" value="N / 1000"></td>
             </tr>
             <tr>
                 <td>Maksimalus aktualių morfemų skaičius</td>

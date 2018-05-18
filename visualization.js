@@ -4,19 +4,22 @@ $(() => {
         width: 600,
         height: 600,
 
-        createImages: (clusters, morphemeMapping, edges, layout, progressCallback) => {
+        createImages: (clusters, morphemeMapping, edges, layout, callback) => {
             var numClusters = 0;
             var result = [];
             for (var c of clusters) {
                 numClusters = Math.max(numClusters, c + 1);
             }
-            for (var i = 0; i < numClusters; i++) {
-                progressCallback(i, numClusters);
+            var createImage = (i) => {
+                if (i >= numClusters) {
+                    return;
+                }
                 var canvas = Visualization.createHiDPICanvas(Visualization.width, Visualization.height);
                 Visualization.drawClusterRelations(i, clusters, morphemeMapping, edges, layout, canvas, Visualization.vertexRadius);
-                result.push(canvas.toDataURL('ímage/png'));
-            }
-            return result;
+                callback(canvas.toDataURL('ímage/png'));
+                window.setTimeout(() => createImage(i + 1), 10);
+            };
+            createImage(0);
         },
 
         drawClusterRelations: (cluster, clusters, morphemeMapping, edges, layout, canvas, vertexRadius) => {
