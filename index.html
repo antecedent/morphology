@@ -100,11 +100,17 @@
                     results.generateLayout
                 );
                 $('.tasks li[data-task=render]').removeClass().addClass('completed');
-                $('.progress-section').hide();
+                $('section:not(.results-section)').hide();
                 $('.results-section').show();
                 var successRate = 0;
+                var validation = results.getValidationSet;
+                if (validation instanceof Array) {
+                    validation = new Set(validation);
+                } else if (!(validation instanceof Set)) {
+                    validation = new Set;
+                }
                 var neologisms = results.inventWords.map((w) => {
-                    if (results.getValidationSet.has(w)) {
+                    if (validation.has(w)) {
                         successRate++;
                         return '<span class="success">' + w + '</span>';
                     }
@@ -190,10 +196,16 @@
 
             $('#upload').change(function () {
                 var reader = new FileReader;
-                reader.readAsText(document.getElementById('upload').files[0]);
-                reader.onloadend = () => {
-                    run(reader.result);
-                };
+                var file = document.getElementById('upload').files[0];
+                reader.readAsText(file);
+                if (file.name.endsWith('.json')) {
+                    reader.onloadend = () => {
+                        window.results = JSON.parse(reader.result);
+                        showResults();
+                    };
+                } else {
+                    reader.onloadend = () => run(reader.result);
+                }
             });
 
             $('.download-segments').click(function() {
@@ -210,6 +222,7 @@
 
             $('.download-results').click(function() {
                 var element = document.createElement('a');
+                results.getValidationSet = Array.from(results.getValidationSet);
                 var blob = new Blob([JSON.stringify(results)], {type: 'text/plain'});
                 element.setAttribute('href', URL.createObjectURL(blob));
                 element.setAttribute('download', 'results-' + (new Date).toISOString().replace(/[^\d]/g, '') + '.json');
@@ -232,7 +245,7 @@
             <dt>Atidaryti failą</dt>
             <dd>
                 <p><input id="upload" type="file"></p>
-                <p><em>Pastabos.</em> Failas iš vietinio įrenginio niekur nesiunčiamas. Priimami tik grynojo teksto (.txt) failai.</p>
+                <p><em>Pastabos.</em> Failas iš vietinio įrenginio niekur nesiunčiamas. Priimami tik grynojo teksto (.txt) failai bei šios programos išsaugotų rezultatų failai.</p>
             </dd>
 
             <dt>Anglų kalba</dt>
