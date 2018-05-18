@@ -14,9 +14,9 @@ Morphology = {
     openClassThresholdFactor: 100,
     successorThresholdFactor: 8,
     numWordsToInvent: 10000,
-    commutationAnomalyFactor: 10,
+    commutationAnomalyFactor: 3,
     trainingSetProportion: 5,
-    maxNumPrimaryCommutations: 10000,
+    maxNumPrimaryCommutations: 3000,
 
     extractWords: (text) => {
         var words = new Set;
@@ -181,7 +181,7 @@ Morphology = {
             var relevantWords = Morphology.searchPrefixTree(prefixTree, wordArray, m2);
             if (m1 != '') {
                 var other = Morphology.searchPrefixTree(prefixTree, wordArray, m1);
-                //relevantWords = relevantWords.filter((w) => other.includes(w));
+                relevantWords = relevantWords.filter((w) => other.includes(w));
             }
             relevantWords = new Set(relevantWords.map((w) => wordArray[w]));
             if (m1 == '') {
@@ -212,6 +212,7 @@ Morphology = {
                 }
             }
         }
+        console.log(preResult);
         for (var c of Object.keys(preResult)) {
             var [m1, m2] = c.split(':');
             for (var t of new Set(preResult[c])) {
