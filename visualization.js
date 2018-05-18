@@ -27,7 +27,17 @@ $(() => {
             for (var c of clusters) {
                 numClusters = Math.max(numClusters, c + 1);
             }
+            var nodes = new Set;
             for (var [i, j] of edges) {
+                if (clusters[i] == cluster || clusters[j] == cluster) {
+                    nodes.add(i);
+                    nodes.add(j);
+                }
+            }
+            for (var [i, j] of edges) {
+                if (!nodes.has(i) || !nodes.has(j)) {
+                    continue;
+                }
                 if (layout[i] == null || layout[j] == null) {
                     continue;
                 }
@@ -66,7 +76,7 @@ $(() => {
                     continue;
                 }
                 var hue = parseInt(33 * (clusters[i] % 10));
-                ctx.fillStyle = 'hsl(' + hue + ', 100%, 50%)';
+                ctx.fillStyle = 'hsla(' + hue + ', 100%, 50%, ' + (nodes.has(i) ? 0.5 : 0.1) + ')';
                 ctx.beginPath();
                 ctx.arc(layout[i].x, layout[i].y, vertexRadius, 0, 2 * Math.PI);
                 ctx.fill();
@@ -77,7 +87,7 @@ $(() => {
                     continue;
                 }
                 ctx.font = '9px \'Segoe UI\', Helvetica, Arial, sans-serif';
-                ctx.fillStyle = 'black';
+                ctx.fillStyle = 'rgba(0, 0, 0, ?)'.replace('?', nodes.has(i) ? 0.75 : 0.25);
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(m, layout[i].x, layout[i].y);
