@@ -159,7 +159,7 @@
                     if (e.data.state == 'completed') {
                         element.find('.progress').text('100');
                         results[e.data.task.replace(/\.\d+$/, '')] = e.data.result;
-                        if (e.data.task == 'segment') {
+                        if (e.data.task == 'done') {
                             showResults();
                         }
                     }
@@ -407,13 +407,13 @@
             </li>
             <li data-task="generateLayout">Išdėstyti kaimynystės schemą plokštumoje (<span class="progress">0</span>%)</li>
             <li data-task="getRelevantEdges">Išrinkti rodykles iš kaimynystės matricos (<span class="progress">0</span>%)</li>
-            <li data-task="segment">Segmentuoti žodžius (<span class="progress">0</span>%)</li>
+            <!--<li data-task="segment">Segmentuoti žodžius (<span class="progress">0</span>%)</li>-->
             <li data-task="render">Nupiešti kaimynystės diagramas (<span class="progress">0</span>%)</li>
         </ul>
     </section>
     <section class="results-section" style="display: none;">
         <h2>Rezultatai</h2>
-        <p><a href="#" class="download-segments" target="_blank">Atsisiųsti segmentuotą tekstą</a></p>
+        <!--<p><a href="#" class="download-segments" target="_blank">Atsisiųsti segmentuotą tekstą</a></p>-->
         <p><a href="#" class="download-results" target="_blank">Išsaugoti analizės rezultatus vėlesnei peržiūrai</a></p>
         <p><a href="" target="_blank">Analizuoti kitą tekstą (naujame skirtuke)</a></p>
         <div class="divergence-notice" style="display: none;">

@@ -80,7 +80,8 @@ onmessage = (e) => {
         task('inventWords', () => inventedWords);
         var layout = task('generateLayout', () => Morphology.generateLayout(Object.keys(morphemeMapping).length, secondPassClusters, numClusters, e.data.canvasWidth, e.data.canvasHeight, e.data.vertexRadius, progress('generateLayout')));
         var edges = task('getRelevantEdges', () => Morphology.getRelevantEdges(adjacencyMatrix, morphemeMapping, progress('getRelevantEdges')));
-        task('segment', () => Morphology.segment(e.data.text, wordsWithBoundaries, secondPassClusters, morphemeTypes, morphemeMapping, progress('segment')));
+        //task('segment', () => Morphology.segment(e.data.text, wordsWithBoundaries, secondPassClusters, morphemeTypes, morphemeMapping, progress('segment')));
+        task('done', () => null)
     } catch (error) {
         // Already handled by task()
     }
