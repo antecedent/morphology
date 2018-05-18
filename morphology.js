@@ -253,32 +253,24 @@ Morphology = {
                         byWord[word] = new Set;
                     }
                     if (m != '') {
-                        byWord[word].add(m);
+                        byWord[word].add(t.indexOf('_'));
+                        byWord[word].add(t.indexOf('_') + m.length);
                     }
                 }
             }
         }
         var preResult = {};
         for (var word of Object.keys(byWord)) {
-            var morphemes = Array.from(byWord[word]).concat(['⋊', '⋉']);
-            var w = '⋊' + word + '⋉';
-            morphemes.sort((m1, m2) => w.indexOf(m1) - w.indexOf(m2));
+            byWord[word].add(-1);
+            byWord[word].add(0);
+            byWord[word].add(word.length);
+            var offsets = Array.from(byWord[word]).map((x) => x + 1);
+            offsets.sort((l, r) => l - r);
             var last = null;
-            var numReversals = 0;
-            for (var i = 0; i < morphemes.length; i++) {
-                if (numReversals > 5) {
-                    break;
-                }
-                var m = morphemes[i];
-                if (!w.startsWith(m)) {
-                    m = w.substring(0, w.indexOf(morphemes[i]));
-                    i--;
-                    numReversals++;
-                }
-                if (m == '') {
-                    break;
-                }
-                w = w.substring(m.length);
+            var w = '⋊' + word + '⋉';
+            console.log(w, offsets);
+            for (var i = 1; i < offsets.length; i++) {
+                var m = w.substring(offsets[i - 1], offsets[i]);
                 if (last != null) {
                     key = last + ':' + m;
                     if (!preResult.hasOwnProperty(key)) {
@@ -649,5 +641,9 @@ Morphology = {
             }
         }
         return [result, text];
+    },
+
+    boost: () => {
+
     }
 };
