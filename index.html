@@ -191,7 +191,14 @@
             };
 
             $('.texts a').click(function () {
-                $.get($(this).data('src'), run);
+                if ($(this).data('src').endsWith('.json')) {
+                    $.getJSON($(this).data('src'), (data) => {
+                        window.results = data;
+                        showResults();
+                    });
+                } else {
+                    $.get($(this).data('src'), run);
+                }
                 return false;
             });
 
@@ -273,7 +280,12 @@
             <dt>Latvių kalba</dt>
             <dd>
                 <ul class="texts">
-                    <li><a href="#" data-src="latvian.txt">30 000 sakinių tekstynas iš naujienų straipsnių (Leipzigo universitetas)</a></li>
+                    <li>
+                        <a href="#" data-src="latvian.txt">30 000 sakinių tekstynas iš naujienų straipsnių (Leipzigo universitetas)</a>
+                        <ul>
+                            <li><a href="#" data-src="results-20180518125916687.json">Gatava analizė (3,93% generavimo tikslumas; paspaudę palaukite)</a></li>
+                        </ul>
+                    </li>
                 </ul>
             </dd>
 
@@ -281,6 +293,7 @@
             <dd>
                 <ul class="texts">
                     <li><a href="#" data-src="lt.txt">Vincas Mykolaitis-Putinas. <em>Altorių šešėly</em> (ištrauka)</a></li>
+                    <li><a href="#" data-src="lithuanian.txt">100 000 sakinių tekstynas iš naujienų straipsnių (Leipzigo universitetas)</a></li>
                 </ul>
             </dd>
 
@@ -288,7 +301,12 @@
             <dd>
                 <ul class="texts">
                     <li><a href="#" data-src="14741-0.txt">Гавриил Романович Державин. <em>Духовные оды</em></a></li>
-                    <li><a href="#" data-src="russian.txt">30 000 sakinių tekstynas iš naujienų straipsnių (Leipzigo universitetas)</a></li>
+                    <li>
+                        <a href="#" data-src="russian.txt">30 000 sakinių tekstynas iš naujienų straipsnių (Leipzigo universitetas)</a>
+                        <ul>
+                            <li><a href="#" data-src="results-20180518132643927">Gatava analizė (3,18% generavimo tikslumas; paspaudę palaukite)</a></li>
+                        </ul>
+                    </li>
                 </ul>
             </dd>
 
