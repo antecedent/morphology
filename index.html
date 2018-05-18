@@ -173,7 +173,7 @@
                 window.parameters = {};
                 var max = Math.max;
                 var min = Math.min;
-                var N = text.split(/\s+/).length;
+                var N = new Set(text.toLowerCase().split(/\s+/)).size;
                 $('.parameters-section input').each(function () {
                     parameters[$(this).data('key')] = parseInt(eval($(this).val()));
                     if (isNaN(parameters[$(this).data('key')])) {
@@ -331,15 +331,15 @@
             </tr>
             <tr>
                 <td>Minimalus komutaciją įrodančių žodžių skaičius</td>
-                <td><input data-key="minCommutationStrength" value="N / 3000"></td>
+                <td><input data-key="minCommutationStrength" value="N / 1000"></td>
             </tr>
             <tr>
                 <td>Pirmojo grupavimo grupių skaičius</td>
-                <td><input data-key="firstPassClusterCount" value="N / 3000"></td>
+                <td><input data-key="firstPassClusterCount" value="N / 200"></td>
             </tr>
             <tr>
                 <td>Antrojo grupavimo grupių skaičius</td>
-                <td><input data-key="secondPassClusterCount" value="N / 3000"></td>
+                <td><input data-key="secondPassClusterCount" value="N / 200"></td>
             </tr>
             <tr>
                 <td>Maksimalus aktualių morfemų skaičius</td>
@@ -347,7 +347,7 @@
             </tr>
             <tr>
                 <td>Morfotaktinių ryšių įtraukties koeficientas</td>
-                <td><input data-key="successorThresholdFactor" value="min(5, N / 20000)"></td>
+                <td><input data-key="successorThresholdFactor" value="max(5, N / 5000)"></td>
             </tr>
             <tr>
                 <td>Apmokymu i skirta teksto proporcija (M : 1)</td>

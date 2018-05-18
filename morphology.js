@@ -180,8 +180,7 @@ Morphology = {
             var hits = {};
             var relevantWords = Morphology.searchPrefixTree(prefixTree, wordArray, m2);
             if (m1 != '') {
-                var other = Morphology.searchPrefixTree(prefixTree, wordArray, m1);
-                relevantWords = relevantWords.filter((w) => other.includes(w));
+                relevantWords = relevantWords.concat(Morphology.searchPrefixTree(prefixTree, wordArray, m1));
             }
             relevantWords = new Set(relevantWords.map((w) => wordArray[w]));
             if (m1 == '') {
@@ -212,7 +211,6 @@ Morphology = {
                 }
             }
         }
-        console.log(preResult);
         for (var c of Object.keys(preResult)) {
             var [m1, m2] = c.split(':');
             for (var t of new Set(preResult[c])) {
