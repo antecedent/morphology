@@ -16,24 +16,26 @@ Morphology = {
     numWordsToInvent: 10000,
     commutationAnomalyFactor: 3,
     trainingSetProportion: 5,
-    maxNumPrimaryCommutations: 3000,
+    maxNumPrimaryCommutations: 5000,
 
     extractWords: (text) => {
         var words = new Set;
-        for (var word of text.toLowerCase().split(/\s+/)) {
+        for (var word of text.toLowerCase().split(/\P{Lowercase}+/u)) {
             word = word.replace(Morphology.leadingPunctuation, '');
             word = word.replace(Morphology.trailingPunctuation, '');
             words.add(word);
         }
         return words;
     },
-    addBoundaryChars: (words) => {
+
+    addBoundaryChars: (words, progressCallback) => {
         var result = new Set;
         for (var word of words) {
             result.add('⋊' + word + '⋉');
         }
-        return result;
+        return [result].concat(Morphology.makePrefixTree(result, progressCallback));
     },
+
     getSubstrings: (word) => {
         var result = new Set;
         result.add('')
@@ -44,6 +46,7 @@ Morphology = {
         }
         return result;
     },
+
     getAllSubstrings: (words) => {
         var result = [];
         for (var word of words) {
@@ -53,6 +56,7 @@ Morphology = {
         }
         return result;
     },
+
     getFrequencyTable: (tokens) => {
         var table = {};
         for (var token of tokens) {
@@ -63,6 +67,7 @@ Morphology = {
         }
         return table;
     },
+
     getSalienceTable: (tokens) => {
         var result = [];
         var frequencies = Morphology.getFrequencyTable(tokens);
@@ -72,6 +77,7 @@ Morphology = {
         result.sort((l, r) => r[0] - l[0]);
         return result;
     },
+
     getSalientSubstrings: (words) => {
         var substrings = Morphology.getAllSubstrings(words);
         var table = Morphology.getSalienceTable(substrings);
@@ -81,10 +87,11 @@ Morphology = {
         }
         return result;
     },
-    commute: (substrings, wordsWithBoundaries, progressCallback) => {
+
+    commute: (substrings, wordsWithBoundaries, prefixTree, wordArray, progressCallback) => {
         var templates = {};
+        var commutations = {};
         var progress = 0;
-        var [prefixTree, wordArray] = Morphology.makePrefixTree(wordsWithBoundaries);
         for (var m of substrings) {
             progressCallback(progress++, substrings.length);
             for (var word of Morphology.searchPrefixTree(prefixTree, wordArray, m).map((i) => wordArray[i])) {
@@ -93,25 +100,27 @@ Morphology = {
                     if (!templates.hasOwnProperty(t)) {
                         templates[t] = new Set;
                     }
-                    templates[t].add(m);
+                    var alternants = [m];
                     if (wordsWithBoundaries.has(t.replace('_', ''))) {
-                        templates[t].add('');
+                        alternants.push('');
                     }
-                }
-            }
-        }
-        var commutations = {};
-        for (var t of Object.keys(templates)) {
-            for (var m1 of templates[t]) {
-                for (var m2 of templates[t]) {
-                    if (m1 == m2) {
-                        continue;
+                    for (var a of alternants) {
+                        for (var b of templates[t]) {
+                            if (a == b) {
+                                continue;
+                            }
+                            var [m1, m2] = [a, b];
+                            if (m2 < m1) {
+                                [m1, m2] = [m2, m1];
+                            }
+                            var key = m1 + ':' + m2;
+                            if (!commutations.hasOwnProperty(key)) {
+                                commutations[key] = new Set;
+                            }
+                            commutations[key].add(t);
+                        }
+                        templates[t].add(a);
                     }
-                    var key = m1 + ':' + m2;
-                    if (!commutations.hasOwnProperty(key)) {
-                        commutations[key] = new Set;
-                    }
-                    commutations[key].add(t);
                 }
             }
         }
@@ -124,105 +133,46 @@ Morphology = {
         return result.slice(0, Morphology.maxNumPrimaryCommutations);
     },
 
-    refineCommutations: (commutations, words /* WITHOUT boundaries */, progressCallback) => {
-        var nodes = new Set;
-        var scores = {};
-        var edges = new Set;
-        for (var [set, m1, m2] of commutations) {
+    refineCommutations: (commutations, words, prefixTree, wordArray, progressCallback) => {
+        var deletions = new Set;
+        var preResult = Array.from(commutations);
+        for (var i = 0; i < preResult.length; i++) {
+            progressCallback(i, preResult.length);
+            var [s, m1, m2] = preResult[i];
+            m1 = m1.replace('⋊', '').replace('⋉', '');
+            m2 = m2.replace('⋊', '').replace('⋉', '');
             if (m2 < m1) {
                 [m1, m2] = [m2, m1];
             }
-            var minor = m1 + ':' + m2;
-            nodes.add(minor);
-            if (!scores.hasOwnProperty(minor)) {
-                scores[minor] = 0;
-            } else {
-                // Duplicate
-                continue;
+            if (preResult.filter((p) => p[1] == m1 && p[2] == m2).length == 0) {
+                preResult.push([[], m1, m2]);
             }
-            scores[minor] += set.size;
-            for (var sub1 of Morphology.getSubstrings(m1)) {
-                for (var sub2 of Morphology.getSubstrings(m2)) {
-                    if (sub2 < sub1) {
-                        [sub1, sub2] = [sub2, sub1];
-                    }
-                    major = sub1 + ':' + sub2;
-                    if (minor != major && m1.replace(sub1, '') == m2.replace(sub2, '')) {
-                        nodes.add(major);
-                        if (!scores.hasOwnProperty(major)) {
-                            scores[major] = 0;
+            preResult[i][0] = new Set(preResult[i][0]);
+            var c1 = preResult[i];
+            for (var j = 0; j < preResult.length; j++) {
+                if (i == j) {
+                    continue;
+                }
+                var c2 = preResult[j];
+                var [s1, x11, x12, s2, x21, x22] = c1.concat(c2);
+                for (var [m11, m12, m21, m22] of [[x11, x12, x21, x22], [x12, x11, x21, x22]]) {
+                    if (m21.replace(m11, '_') == m22.replace(m12, '_') || (m11 == '' && m21 == m22.replace(m12, ''))) {
+                        for (var t of s2) {
+                            preResult[i][0].add(t.replace('_', m22.replace(m12, '_')));
                         }
-                        scores[major] += set.size;
-                        edges.add([major, minor]);
+                        deletions.add(j);
                     }
                 }
             }
         }
-        var total = nodes.size / 2;
-        var k = 0;
-        for (var c1 of new Set(nodes)) {
-            if (!nodes.has(c1)) {
-                continue;
-            }
-            progressCallback(Math.min(k++, total), total);
-            for (var c2 of new Set(nodes)) {
-                var [m1, m2, m3, m4] = c1.split(':').concat(c2.split(':'));
-                if (c1 != c2 && scores[c1] >= scores[c2] && m3.replace(m1, '') == m4.replace(m2, '')) {
-                    nodes.delete(c2);
-                }
-            }
+        for (var deletion of deletions) {
+            preResult[deletion] = null;
         }
-        var preResult = {};
-        var progress = 0;
-        var [prefixTree, wordArray] = Morphology.makePrefixTree(words);
-        for (var c of nodes) {
-            var [m1, m2] = c.split(':');
-            var hits = {};
-            var relevantWords = Morphology.searchPrefixTree(prefixTree, wordArray, m2);
-            if (m1 != '') {
-                relevantWords = relevantWords.concat(Morphology.searchPrefixTree(prefixTree, wordArray, m1));
-            }
-            relevantWords = new Set(relevantWords.map((w) => wordArray[w]));
-            if (m1 == '') {
-                for (var r of Array.from(relevantWords)) {
-                    if (words.has(r.replace(m2, ''))) {
-                        relevantWords.add(r.replace(m2, ''));
-                    }
-                }
-            }
-            for (var word of relevantWords) {
-                for (var m of [m1, m2]) {
-                    var key = word.replace(m, '');
-                    if (!hits.hasOwnProperty(key)) {
-                        hits[key] = [];
-                    }
-                    hits[key].push(m == '' ? word : word.replace(m, '_'));
-                }
-            }
-            preResult[m1 + ':' + m2] = new Set;
-            for (var t of Object.keys(hits)) {
-                if (hits[t].length > 1) {
-                    for (var hit of hits[t]) {
-                        if (hit.includes('_')) {
-                            preResult[m1 + ':' + m2].add(hit);
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-        for (var c of Object.keys(preResult)) {
-            var [m1, m2] = c.split(':');
-            for (var t of new Set(preResult[c])) {
-                if ((t.match(/_/g) || []).length > 1 || !words.has(t.replace('_', m1)) || !words.has(t.replace('_', m2))) {
-                    preResult[c].delete(t);
-                }
-            }
-        }
+        preResult = preResult.filter((r) => r !== null);
         var result = [];
-        for (var c of Object.keys(preResult)) {
-            var [m1, m2] = c.split(':');
-            var set = Morphology.removeAnomalies(preResult[c]);
+        for (var c of preResult) {
+            var [set, m1, m2] = c;
+            var set = Morphology.removeAnomalies(set);
             if (set.size > Morphology.minCommutationStrength) {
                 result.push([set, m1, m2]);
             }
@@ -240,9 +190,9 @@ Morphology = {
         };
         for (var proof of commutationProofs) {
             var pivot = proof.indexOf('_');
-            if (pivot == 0) {
+            if (pivot == 1) {
                 distribution.leftMarginal.push(proof);
-            } else if (pivot == proof.length - 1) {
+            } else if (pivot == proof.length - 2) {
                 distribution.rightMarginal.push(proof);
             } else if (pivot < proof.length / 2) {
                 distribution.left.push(proof);
@@ -280,14 +230,14 @@ Morphology = {
         }
         var preResult = {};
         for (var word of Object.keys(byWord)) {
-            byWord[word].add(-1);
             byWord[word].add(0);
+            byWord[word].add(1);
+            byWord[word].add(word.length - 1);
             byWord[word].add(word.length);
-            byWord[word].add(word.length + 1);
-            var offsets = Array.from(byWord[word]).map((x) => x + 1);
+            var offsets = Array.from(byWord[word]);
             offsets.sort((l, r) => l - r);
             var last = null;
-            var w = '⋊' + word + '⋉';
+            var w = word;
             for (var i = 1; i < offsets.length; i++) {
                 var m = w.substring(offsets[i - 1], offsets[i]);
                 if (last != null) {
@@ -391,9 +341,18 @@ Morphology = {
         return result;
     },
 
-    doFirstPassClustering: (adjacencyMatrix) => {
+    doFirstPassClustering: (adjacencyMatrix, progressCallback) => {
+        var maxNumIterations = 20;
         var features = Morphology.concatenateMatrices(adjacencyMatrix, Morphology.transposeMatrix(adjacencyMatrix));
-        return ML.KMeans(features, Morphology.firstPassClusterCount, {initialization: 'random'}).clusters;
+        var result = {converged: false};
+        var centroids = 'random';
+        var iteration = 0;
+        while (!result.converged && iteration < maxNumIterations) {
+            result = ML.KMeans(features, Morphology.firstPassClusterCount, {initialization: centroids, maxIterations: 1});
+            centroids = result.centroids.map((c) => c.centroid);
+            progressCallback(iteration++, maxNumIterations);
+        }
+        return result.clusters;
     },
 
     doSecondPassClustering: (adjacencyMatrix, firstPassClusters) => {
@@ -597,12 +556,12 @@ Morphology = {
             if (depth > depthLimit) {
                 return;
             }
-            if (state == final && prefix.length > 0 && !words.has(prefix)) {
-                result.add(prefix);
+            if (result.size >= Morphology.numWordsToInvent) {
                 return;
             }
-            progressCallback(result.size, Morphology.numWordsToInvent);
-            if (result.size >= Morphology.numWordsToInvent) {
+            if (state == final && prefix.length > 0 && !words.has(prefix)) {
+                result.add(prefix);
+                progressCallback(result.size, Morphology.numWordsToInvent);
                 return;
             }
             for (var newDepthLimit = depth + 1; newDepthLimit <= depthLimit; newDepthLimit++) {
@@ -646,7 +605,7 @@ Morphology = {
         var k = 0;
         text = text.replace(/-/g, ' ');
         for (var word of words) {
-            progressCallback(k, words.size);
+            progressCallback(k++, words.size);
             result[word] = run(word.substring(1), clusters[morphemeMapping['⋊']]);
             if (result[word] !== null) {
                 result[word] = result[word].slice(0, -1);
@@ -662,10 +621,11 @@ Morphology = {
         return [result, text];
     },
 
-    makePrefixTree: (words) => {
+    makePrefixTree: (words, progressCallback) => {
         var wordArray = Array.from(words);
         var result = {items: []};
         for (var i = 0; i < wordArray.length; i++) {
+            progressCallback(i, wordArray.length);
             for (var j = 0; j < wordArray[i].length; j++) {
                 var suffix = wordArray[i].substring(j);
                 var node = result;

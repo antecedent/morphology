@@ -130,7 +130,7 @@
                 });
                 neologisms.sort();
                 $('.neologisms').html(neologisms.join(', '));
-                var percentage = 100 * successRate / parseInt($('[data-key=numWordsToInvent]').val());
+                var percentage = results.score * 100;
                 $('.success-rate').text(percentage.toFixed(2).replace('.', ','));
                 if (isNaN(percentage)) {
                     $('.morphotactics').hide();
@@ -154,13 +154,20 @@
                     var element = $('.tasks li[data-task="?"]'.replace('?', e.data.task));
                     element.removeClass().addClass(e.data.state);
                     if (e.data.state == 'progress') {
-                        element.find('.progress').text(e.data.progress);
+                        $('[data-task="?"] .progress'.replace('?', e.data.task)).text(e.data.progress);
                     }
                     if (e.data.state == 'completed') {
                         element.find('.progress').text('100');
                         results[e.data.task.replace(/\.\d+$/, '')] = e.data.result;
-                        if (e.data.task == 'done') {
+                        if (e.data.task == 'ready') {
                             showResults();
+                        }
+                        if (e.data.task == 'segment') {
+                            $('.preparing-segments').hide();
+                            $('.download-segments').show();
+                        }
+                        if (e.data.task == 'done') {
+                            worker.terminate();
                         }
                     }
                     if (e.data.state == 'failed') {
@@ -213,7 +220,7 @@
                 }
             });
 
-            $('.download-segments').click(function() {
+            $('.download-segments a').click(function() {
                 var element = document.createElement('a');
                 var blob = new Blob([results.segment[1]], {type: 'text/plain'});
                 element.setAttribute('href', URL.createObjectURL(blob));
@@ -340,11 +347,11 @@
             </tr>
             <tr>
                 <td>Grupavimo bandymų skaičius</td>
-                <td><input type="number" data-key="numClusteringIterations" value="5"></td>
+                <td><input type="number" data-key="numClusteringIterations" value="3"></td>
             </tr>
             <tr>
                 <td>Įsimintinų raidžių samplaikų skaičius</td>
-                <td><input data-key="numSalientSubstrings" value="3000"></td>
+                <td><input data-key="numSalientSubstrings" value="5000"></td>
             </tr>
             <tr>
                 <td>Idealus įsimintinos samplaikos ilgis</td>
@@ -352,19 +359,23 @@
             </tr>
             <tr>
                 <td>Minimalus komutaciją įrodančių žodžių skaičius</td>
-                <td><input data-key="minCommutationStrength" value="N / 300"></td>
+                <td><input data-key="minCommutationStrength" value="max(20, N / 500)"></td>
+            </tr>
+            <tr>
+                <td>Maksimalus komutacijų skaičius iki tikslinimo</td>
+                <td><input data-key="maxNumPrimaryCommutations" value="1000"></td>
             </tr>
             <tr>
                 <td>Pirmojo grupavimo grupių skaičius</td>
-                <td><input data-key="firstPassClusterCount" value="N / 1000"></td>
+                <td><input data-key="firstPassClusterCount" value="max(60, N / 1000)"></td>
             </tr>
             <tr>
                 <td>Antrojo grupavimo grupių skaičius</td>
-                <td><input data-key="secondPassClusterCount" value="N / 1000"></td>
+                <td><input data-key="secondPassClusterCount" value="max(20, N / 3000)"></td>
             </tr>
             <tr>
                 <td>Maksimalus aktualių morfemų skaičius</td>
-                <td><input data-key="pruningThreshold" value="2000"></td>
+                <td><input data-key="pruningThreshold" value="1000"></td>
             </tr>
             <tr>
                 <td>Morfotaktinių ryšių įtraukties koeficientas</td>
@@ -376,7 +387,7 @@
             </tr>
             <tr>
                 <td>Generuotinų naujadarų skaičius</td>
-                <td><input data-key="numWordsToInvent" value="10000"></td>
+                <td><input data-key="numWordsToInvent" value="N / 5"></td>
             </tr>
             <!-- <tr>
                 <td>Klasės uždarumo slenksčio koeficientas</td>
@@ -388,7 +399,7 @@
         <h2>Eiga</h2>
         <ul class="tasks">
             <li data-task="extractWords">Išrinkti žodžius</li>
-            <li data-task="addBoundaryChars">Sudėti ribų ženklus</li>
+            <li data-task="addBoundaryChars">Sudaryti duomenų struktūrą žodžių paieškai (<span class="progress">0</span>%)</li>
             <li data-task="getSalientSubstrings">Rasti dažnai pasikartojančias raidžių samplaikas</li>
             <li data-task="commute">Atlikti komutacijų testus (<span class="progress">0</span>%)</li>
             <li data-task="refineCommutations">Patikslinti komutacijų testų rezultatus (<span class="progress">0</span>%)</li>
@@ -398,7 +409,7 @@
             <li class="iteration" data-counter="i">
                 <strong>{i} bandymas grupuoti kandidatines morfemas:</strong>
                 <ul>
-                    <li data-task="doFirstPassClustering.{i}">Sugrupuoti morfemas su panašiomis kaimynystės savybėmis</li>
+                    <li data-task="doFirstPassClustering.{i}">Sugrupuoti morfemas pagal kaimynystės savybes (<span class="progress">0</span>%)</li>
                     <li data-task="doSecondPassClustering.{i}">Patikslinti morfemų grupavimą</li>
                     <li data-task="renumberClusters.{i}">Atnaujinti grupių numeraciją</li>
                     <li data-task="guessClusterTypes.{i}">Nustatyti morfemų grupių tipus</li>
@@ -407,13 +418,13 @@
             </li>
             <li data-task="generateLayout">Išdėstyti kaimynystės schemą plokštumoje (<span class="progress">0</span>%)</li>
             <li data-task="getRelevantEdges">Išrinkti rodykles iš kaimynystės matricos (<span class="progress">0</span>%)</li>
-            <!--<li data-task="segment">Segmentuoti žodžius (<span class="progress">0</span>%)</li>-->
             <li data-task="render">Nupiešti kaimynystės diagramas (<span class="progress">0</span>%)</li>
         </ul>
     </section>
     <section class="results-section" style="display: none;">
         <h2>Rezultatai</h2>
-        <!--<p><a href="#" class="download-segments" target="_blank">Atsisiųsti segmentuotą tekstą</a></p>-->
+        <p class="preparing-segments" data-task="segment">Ruošiamas segmentuotas tekstas (<span class="progress">0</span>%)</p>
+        <p class="download-segments" style="display: none;"><a href="#" target="_blank">Atsisiųsti segmentuotą tekstą</a></p>
         <p><a href="#" class="download-results" target="_blank">Išsaugoti analizės rezultatus vėlesnei peržiūrai</a></p>
         <p><a href="" target="_blank">Analizuoti kitą tekstą (naujame skirtuke)</a></p>
         <div class="divergence-notice" style="display: none;">

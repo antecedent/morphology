@@ -49,17 +49,17 @@ onmessage = (e) => {
             }
         }
         task('getValidationSet', () => validationWords);
-        var wordsWithBoundaries = task('addBoundaryChars', () => Morphology.addBoundaryChars(words));
+        var [wordsWithBoundaries, prefixTree, wordArray] = task('addBoundaryChars', () => Morphology.addBoundaryChars(words, progress('addBoundaryChars')));
         var substrings = task('getSalientSubstrings', () => Morphology.getSalientSubstrings(wordsWithBoundaries));
-        var commutations = task('commute', () => Morphology.commute(substrings, wordsWithBoundaries, progress('commute')));
-        commutations = task('refineCommutations', () => Morphology.refineCommutations(commutations, words, progress('refineCommutations')));
+        var commutations = task('commute', () => Morphology.commute(substrings, wordsWithBoundaries, prefixTree, wordArray, progress('commute')));
+        commutations = task('refineCommutations', () => Morphology.refineCommutations(commutations, words, prefixTree, wordArray, progress('refineCommutations')));
         var bigrams = task('getBigrams', () => Morphology.getBigrams(commutations));
         var morphemes = task('getMorphemes', () => Morphology.getMorphemes(bigrams));
         var [adjacencyMatrix, morphemeMapping] = task('getAdjacencyMatrix', () => Morphology.getAdjacencyMatrix(bigrams, morphemes, trainingSet.toLowerCase()));
         var score = 0;
         var secondPassClusters, numClusters, morphemeTypes, inventedWords;
         for (var i = 1; i <= e.data.parameters.numClusteringIterations; i++) {
-            var _firstPassClusters = task('doFirstPassClustering.' + i, () => Morphology.doFirstPassClustering(adjacencyMatrix));
+            var _firstPassClusters = task('doFirstPassClustering.' + i, () => Morphology.doFirstPassClustering(adjacencyMatrix, progress('doFirstPassClustering.' + i)));
             var _secondPassClusters = task('doSecondPassClustering.' + i, () => Morphology.doSecondPassClustering(adjacencyMatrix, _firstPassClusters));
             var _numClusters;
             [_secondPassClusters, _numClusters] = task('renumberClusters.' + i, () => Morphology.renumberClusters(_secondPassClusters, Morphology.secondPassClusterCount, morphemeMapping));
@@ -80,7 +80,8 @@ onmessage = (e) => {
         task('inventWords', () => inventedWords);
         var layout = task('generateLayout', () => Morphology.generateLayout(Object.keys(morphemeMapping).length, secondPassClusters, numClusters, e.data.canvasWidth, e.data.canvasHeight, e.data.vertexRadius, progress('generateLayout')));
         var edges = task('getRelevantEdges', () => Morphology.getRelevantEdges(adjacencyMatrix, morphemeMapping, progress('getRelevantEdges')));
-        //task('segment', () => Morphology.segment(e.data.text, wordsWithBoundaries, secondPassClusters, morphemeTypes, morphemeMapping, progress('segment')));
+        task('ready', () => null)
+        task('segment', () => Morphology.segment(e.data.text, wordsWithBoundaries, secondPassClusters, morphemeTypes, morphemeMapping, progress('segment')));
         task('done', () => null)
     } catch (error) {
         // Already handled by task()
