@@ -51,8 +51,13 @@ onmessage = (e) => {
         task('getValidationSet', () => validationWords);
         var [wordsWithBoundaries, prefixTree, wordArray] = task('addBoundaryChars', () => Morphology.addBoundaryChars(words, progress('addBoundaryChars')));
         var substrings = task('getSalientSubstrings', () => Morphology.getSalientSubstrings(wordsWithBoundaries));
+
+        preliminaryWords = [];
+        words = new Set;
+        //wordsWithBoundaries = new Set;
+
         var commutations = task('commute', () => Morphology.commute(substrings, wordsWithBoundaries, prefixTree, wordArray, progress('commute')));
-        commutations = task('refineCommutations', () => Morphology.refineCommutations(commutations, words, prefixTree, wordArray, progress('refineCommutations')));
+        commutations = task('refineCommutations', () => Morphology.refineCommutations(commutations, prefixTree, wordArray, progress('refineCommutations')));
         var bigrams = task('getBigrams', () => Morphology.getBigrams(commutations));
         var morphemes = task('getMorphemes', () => Morphology.getMorphemes(bigrams));
         var [adjacencyMatrix, morphemeMapping] = task('getAdjacencyMatrix', () => Morphology.getAdjacencyMatrix(bigrams, morphemes, trainingSet.toLowerCase()));
@@ -64,7 +69,7 @@ onmessage = (e) => {
             var _numClusters;
             [_secondPassClusters, _numClusters] = task('renumberClusters.' + i, () => Morphology.renumberClusters(_secondPassClusters, Morphology.secondPassClusterCount, morphemeMapping));
             var _morphemeTypes = task('guessClusterTypes.' + i, () => Morphology.guessClusterTypes(_numClusters, _secondPassClusters, adjacencyMatrix, morphemeMapping));
-            var _inventedWords = task('inventWords.' + i, () => Morphology.inventWords(_numClusters, _morphemeTypes, _secondPassClusters[morphemeMapping['⋊']], _secondPassClusters[morphemeMapping['⋉']], words, progress('inventWords.' + i)));
+            var _inventedWords = task('inventWords.' + i, () => Morphology.inventWords(_numClusters, _morphemeTypes, _secondPassClusters[morphemeMapping['⋊']], _secondPassClusters[morphemeMapping['⋉']], prefixTree, progress('inventWords.' + i)));
             var _score = _inventedWords.filter((w) => validationWords.has(w)).length / Morphology.numWordsToInvent;
             task('score.' + i, () => _score);
             if (_score >= score) {

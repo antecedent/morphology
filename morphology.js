@@ -94,14 +94,15 @@ Morphology = {
         var progress = 0;
         for (var m of substrings) {
             progressCallback(progress++, substrings.length);
-            for (var word of Morphology.searchPrefixTree(prefixTree, wordArray, m).map((i) => wordArray[i])) {
+            for (var word of Morphology.searchPrefixTree(prefixTree, m).map((i) => wordArray[i])) {
                 if (word.includes(m)) {
-                    t = word.replace(m, '_');
+                    var t = word.replace(m, '_');
                     if (!templates.hasOwnProperty(t)) {
                         templates[t] = new Set;
                     }
                     var alternants = [m];
-                    if (wordsWithBoundaries.has(t.replace('_', ''))) {
+                    var u = t.replace('_', '');
+                    if (wordsWithBoundaries.has(u)) {
                         alternants.push('');
                     }
                     for (var a of alternants) {
@@ -133,7 +134,7 @@ Morphology = {
         return result.slice(0, Morphology.maxNumPrimaryCommutations);
     },
 
-    refineCommutations: (commutations, words, prefixTree, wordArray, progressCallback) => {
+    refineCommutations: (commutations, prefixTree, wordArray, progressCallback) => {
         var deletions = new Set;
         for (var i = 0; i < commutations.length; i++) {
             progressCallback(i, commutations.length);
@@ -143,7 +144,7 @@ Morphology = {
             if (m2 < m1) {
                 [m1, m2] = [m2, m1];
             }
-            if (commutations.filter((p) => p[1] == m1 && p[2] == m2).length == 0) {
+            if (commutations.filter((p) => (p[1] == m1 && p[2] == m2) || (p[1] == m2 && p[2] == m1)).length == 0) {
                 commutations.push([new Set, m1, m2]);
             }
             var c1 = commutations[i];
@@ -539,7 +540,7 @@ Morphology = {
         return result;
     },
 
-    inventWords: (numClusters, clusterInfo, initial, final, words, progressCallback) => {
+    inventWords: (numClusters, clusterInfo, initial, final, prefixTree, progressCallback) => {
         var result = new Set;
         var shuffle = (array) => {
             var result = Array.from(array);
@@ -556,7 +557,7 @@ Morphology = {
             if (result.size >= Morphology.numWordsToInvent) {
                 return;
             }
-            if (state == final && prefix.length > 0 && !words.has(prefix)) {
+            if (state == final && prefix.length > 0 && Morphology.searchPrefixTree(prefixTree, prefix).length == 0) {
                 result.add(prefix);
                 progressCallback(result.size, Morphology.numWordsToInvent);
                 return;
@@ -639,7 +640,7 @@ Morphology = {
         return [result, wordArray];
     },
 
-    searchPrefixTree: (tree, wordArray, substring) => {
+    searchPrefixTree: (tree, substring) => {
         var node = tree;
         for (var i = 0; i < substring.length; i++) {
             var letter = substring[i];
