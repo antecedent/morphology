@@ -159,7 +159,7 @@
                     if (e.data.state == 'completed') {
                         element.find('.progress').text('100');
                         var key = e.data.task.replace(/\.\d+$/, '');
-                        if (['inventWords', 'commute', 'refineCommutations', 'renumberClusters', 'getAdjacencyMatrix', 'getRelevantEdges', 'generateLayout', 'getValidationSet', 'guessClusterTypes'].includes(key)) {
+                        if (['score', 'inventWords', 'commute', 'refineCommutations', 'renumberClusters', 'getAdjacencyMatrix', 'getRelevantEdges', 'generateLayout', 'getValidationSet', 'guessClusterTypes'].includes(key)) {
                             results[key] = e.data.result;
                         }
                         if (e.data.task == 'ready') {

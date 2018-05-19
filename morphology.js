@@ -540,7 +540,7 @@ Morphology = {
         return result;
     },
 
-    inventWords: (numClusters, clusterInfo, initial, final, prefixTree, progressCallback) => {
+    inventWords: (numClusters, clusterInfo, initial, final, words, progressCallback) => {
         var result = new Set;
         var shuffle = (array) => {
             var result = Array.from(array);
@@ -557,7 +557,7 @@ Morphology = {
             if (result.size >= Morphology.numWordsToInvent) {
                 return;
             }
-            if (state == final && prefix.length > 0 && Morphology.searchPrefixTree(prefixTree, prefix).length == 0) {
+            if (state == final && prefix.length > 0 && !words.has(prefix)) {
                 result.add(prefix);
                 progressCallback(result.size, Morphology.numWordsToInvent);
                 return;
