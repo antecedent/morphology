@@ -16,7 +16,7 @@ Morphology = {
     numWordsToInvent: 10000,
     commutationAnomalyFactor: 3,
     trainingSetProportion: 5,
-    maxNumPrimaryCommutations: 5000,
+    maxNumPrimaryCommutations: 3000,
 
     extractWords: (text) => {
         var words = new Set;
