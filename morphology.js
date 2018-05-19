@@ -135,30 +135,28 @@ Morphology = {
 
     refineCommutations: (commutations, words, prefixTree, wordArray, progressCallback) => {
         var deletions = new Set;
-        var preResult = Array.from(commutations);
-        for (var i = 0; i < preResult.length; i++) {
-            progressCallback(i, preResult.length);
-            var [s, m1, m2] = preResult[i];
+        for (var i = 0; i < commutations.length; i++) {
+            progressCallback(i, commutations.length);
+            var [s, m1, m2] = commutations[i];
             m1 = m1.replace('⋊', '').replace('⋉', '');
             m2 = m2.replace('⋊', '').replace('⋉', '');
             if (m2 < m1) {
                 [m1, m2] = [m2, m1];
             }
-            if (preResult.filter((p) => p[1] == m1 && p[2] == m2).length == 0) {
-                preResult.push([[], m1, m2]);
+            if (commutations.filter((p) => p[1] == m1 && p[2] == m2).length == 0) {
+                commutations.push([new Set, m1, m2]);
             }
-            preResult[i][0] = new Set(preResult[i][0]);
-            var c1 = preResult[i];
-            for (var j = 0; j < preResult.length; j++) {
+            var c1 = commutations[i];
+            for (var j = 0; j < commutations.length; j++) {
                 if (i == j) {
                     continue;
                 }
-                var c2 = preResult[j];
+                var c2 = commutations[j];
                 var [s1, x11, x12, s2, x21, x22] = c1.concat(c2);
                 for (var [m11, m12, m21, m22] of [[x11, x12, x21, x22], [x12, x11, x21, x22]]) {
                     if (m21.replace(m11, '_') == m22.replace(m12, '_') || (m11 == '' && m21 == m22.replace(m12, ''))) {
                         for (var t of s2) {
-                            preResult[i][0].add(t.replace('_', m22.replace(m12, '_')));
+                            commutations[i][0].add(t.replace('_', m22.replace(m12, '_')));
                         }
                         deletions.add(j);
                     }
@@ -166,12 +164,11 @@ Morphology = {
             }
         }
         for (var deletion of deletions) {
-            preResult[deletion] = null;
+            commutations[deletion] = null;
         }
-        preResult = preResult.filter((r) => r !== null);
+        commutations = commutations.filter((r) => r !== null);
         var result = [];
-        for (var c of preResult) {
-            var [set, m1, m2] = c;
+        for (var [set, m1, m2] of commutations) {
             var set = Morphology.removeAnomalies(set);
             if (set.size > Morphology.minCommutationStrength) {
                 result.push([set, m1, m2]);
