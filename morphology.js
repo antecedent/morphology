@@ -457,9 +457,10 @@ Morphology = {
             var lastClustering = Array.from(firstPassClusters);
             var score = 0;
             var preResult = [];
+            var shuffledOperations = Morphology.shuffle(operations);
             for (var j = 0; j < numInnerIterations; j++) {
-                progressCallback((i * numInnerIterations) + j, numOuterIterations * numInnerIterations);                
-                var op = operations[parseInt(Math.random() * operations.length)];
+                progressCallback((i * numInnerIterations) + j, numOuterIterations * numInnerIterations);
+                var op = shuffledOperations[j];
                 if (op.type == 'merge') {
                     var newClustering = Array.from(lastClustering);
                     for (var k = 0; k < newClustering.length; k++) {
