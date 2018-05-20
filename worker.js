@@ -58,26 +58,66 @@ onmessage = (e) => {
         commutations = task('refineCommutations', () => Morphology.refineCommutations(commutations, prefixTree, wordArray, progress('refineCommutations')));
         var bigrams = task('getBigrams', () => Morphology.getBigrams(commutations));
         var morphemes = task('getMorphemes', () => Morphology.getMorphemes(bigrams));
-        var [adjacencyMatrix, morphemeMapping] = task('getAdjacencyMatrix', () => Morphology.getAdjacencyMatrix(bigrams, morphemes, trainingSet.toLowerCase()));
-        var score = 0;
+        var [adjacencyMatrix, morphemeMapping, relevantMorphemes] = task('getAdjacencyMatrix', () => Morphology.getAdjacencyMatrix(bigrams, morphemes, commutations, trainingSet.toLowerCase()));
+        var _firstPassClusters = task('doFirstPassClustering', () => Morphology.doFirstPassClustering(
+            adjacencyMatrix,
+            relevantMorphemes,
+            commutations,
+            morphemeMapping
+        ));
+        var [score, secondPassClusters, numClusters, morphemeTypes, inventedWords] = task('doSecondPassClustering.1', () => Morphology.doSecondPassClustering(
+            adjacencyMatrix,
+            _firstPassClusters,
+            words,
+            validationWords,
+            morphemeMapping,
+            progress('doSecondPassClustering.1')
+        ));
+
         var secondPassClusters, numClusters, morphemeTypes, inventedWords;
-        for (var i = 1; i <= e.data.parameters.numClusteringIterations; i++) {
-            var _firstPassClusters = task('doFirstPassClustering.' + i, () => Morphology.doFirstPassClustering(adjacencyMatrix, progress('doFirstPassClustering.' + i)));
-            var _secondPassClusters = task('doSecondPassClustering.' + i, () => Morphology.doSecondPassClustering(adjacencyMatrix, _firstPassClusters));
-            var _numClusters;
-            [_secondPassClusters, _numClusters] = task('renumberClusters.' + i, () => Morphology.renumberClusters(_secondPassClusters, Morphology.secondPassClusterCount, morphemeMapping));
-            var _morphemeTypes = task('guessClusterTypes.' + i, () => Morphology.guessClusterTypes(_numClusters, _secondPassClusters, adjacencyMatrix, morphemeMapping));
-            var _inventedWords = task('inventWords.' + i, () => Morphology.inventWords(_numClusters, _morphemeTypes, _secondPassClusters[morphemeMapping['⋊']], _secondPassClusters[morphemeMapping['⋉']], words, progress('inventWords.' + i)));
-            var _score = _inventedWords.filter((w) => validationWords.has(w)).length / Morphology.numWordsToInvent;
-            task('score.' + i, () => _score);
-            if (_score >= score) {
-                secondPassClusters = _secondPassClusters;
-                numClusters = _numClusters;
-                morphemeTypes = _morphemeTypes;
-                inventedWords = _inventedWords;
-                score = _score;
+        var numFirstPassClusters = (new Set(_firstPassClusters)).size;
+
+
+
+        /*
+        var score = 0;
+        var z = 1;
+        var _window = [];
+        var left = 1;
+        var right = numFirstPassClusters;
+        for (var i = 1; Math.abs(right - left) > 2; i++) {
+            console.log(left, right);
+            var [leftThird, rightThird] = [parseInt(left + (right - left) / 3), parseInt(right - (right - left) / 3)];
+            var [fLeftThird, fRightThird] = [leftThird, rightThird].map((k) => {
+                var scores = [];
+                for (var j = 1; j <= 10; j++) {
+                    Morphology.secondPassClusterCount = parseInt((left + right) / 2);
+                    var _secondPassClusters = task('doSecondPassClustering.' + i, () => Morphology.doSecondPassClustering(adjacencyMatrix, _firstPassClusters, progress('doSecondPassClustering.' + i)));
+                    var _numClusters;
+                    [_secondPassClusters, _numClusters] = task('renumberClusters.' + i, () => Morphology.renumberClusters(_secondPassClusters, Morphology.secondPassClusterCount, morphemeMapping));
+                    var _morphemeTypes = task('guessClusterTypes.' + i, () => Morphology.guessClusterTypes(_numClusters, _secondPassClusters, adjacencyMatrix, morphemeMapping));
+                    var _inventedWords = task('inventWords.' + i, () => Morphology.inventWords(_numClusters, _morphemeTypes, _secondPassClusters[morphemeMapping['⋊']], _secondPassClusters[morphemeMapping['⋉']], words, progress('inventWords.' + i)));
+                    var _score = _inventedWords.filter((w) => validationWords.has(w)).length / Morphology.numWordsToInvent;
+                    task('score.' + i, () => score);
+                    if (_score / k >= score / z) {
+                        secondPassClusters = _secondPassClusters;
+                        numClusters = _numClusters;
+                        morphemeTypes = _morphemeTypes;
+                        inventedWords = _inventedWords;
+                        score = _score;
+                        z = k;
+                    }
+                    scores.push(_score / k);
+                }
+                return scores.reduce((a, x) => Math.max(a, x), 0);
+            });
+            if (fLeftThird < fRightThird) {
+                left = leftThird;
+            } else {
+                right = rightThird;
             }
         }
+        */
         task('renumberClusters', () => [secondPassClusters, numClusters]);
         task('guessClusterTypes', () => morphemeTypes);
         task('inventWords', () => inventedWords);

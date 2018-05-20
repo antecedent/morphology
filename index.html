@@ -126,7 +126,7 @@
                         successRate++;
                         return '<span class="success">' + w + '</span>';
                     }
-                    return w;
+                    return w.replace('<', '&lt;').replace('>', '&gt;');
                 });
                 neologisms.sort();
                 $('.neologisms').html(neologisms.join(', '));
@@ -141,11 +141,21 @@
             };
 
             var run = (text) => {
-                var iterator = $('.iteration');
-                for (var i = parseInt($('.parameters-section input[data-key=numClusteringIterations]').val()); i > 0; i--) {
-                    $(iterator[0].outerHTML.replace(new RegExp('{' + iterator.data('counter') + '}', 'g'), i)).insertAfter(iterator);
-                }
-                iterator.detach();
+                window.parameters = {};
+                var max = Math.max;
+                var min = Math.min;
+                var N = new Set(text.toLowerCase().split(/\s+/)).size;
+                $('.parameters-section input').each(function () {
+                    parameters[$(this).data('key')] = parseInt(eval($(this).val()));
+                    if (isNaN(parameters[$(this).data('key')])) {
+                        return;
+                    }
+                });
+                // var iterator = $('.iteration');
+                // for (var i = parseInt(Math.log(parameters.pruningThreshold) / Math.log(3)) + 5; i > 0; i--) {
+                //     $(iterator[0].outerHTML.replace(new RegExp('{' + iterator.data('counter') + '}', 'g'), i)).insertAfter(iterator);
+                // }
+                // iterator.detach();
                 $('.texts-section, .parameters-section').hide();
                 var worker = new Worker('worker.js');
                 $('.tasks li').removeClass();
@@ -159,9 +169,7 @@
                     if (e.data.state == 'completed') {
                         element.find('.progress').text('100');
                         var key = e.data.task.replace(/\.\d+$/, '');
-                        if (['score', 'inventWords', 'commute', 'refineCommutations', 'renumberClusters', 'getAdjacencyMatrix', 'getRelevantEdges', 'generateLayout', 'getValidationSet', 'guessClusterTypes'].includes(key)) {
-                            results[key] = e.data.result;
-                        }
+                        results[key] = e.data.result;
                         if (e.data.task == 'ready') {
                             showResults();
                         }
@@ -178,16 +186,6 @@
                         console.log(e.data.stack);
                     }
                 };
-                window.parameters = {};
-                var max = Math.max;
-                var min = Math.min;
-                var N = new Set(text.toLowerCase().split(/\s+/)).size;
-                $('.parameters-section input').each(function () {
-                    parameters[$(this).data('key')] = parseInt(eval($(this).val()));
-                    if (isNaN(parameters[$(this).data('key')])) {
-                        return;
-                    }
-                });
                 worker.postMessage({
                     text: text,
                     vertexRadius: Visualization.vertexRadius,
@@ -349,10 +347,6 @@
                 <td><input readonly value="N"></td>
             </tr>
             <tr>
-                <td>Grupavimo bandymų skaičius</td>
-                <td><input type="number" data-key="numClusteringIterations" value="3"></td>
-            </tr>
-            <tr>
                 <td>Įsimintinų raidžių samplaikų skaičius</td>
                 <td><input data-key="numSalientSubstrings" value="3000"></td>
             </tr>
@@ -369,20 +363,8 @@
                 <td><input data-key="maxNumPrimaryCommutations" value="3000"></td>
             </tr>
             <tr>
-                <td>Pirmojo grupavimo grupių skaičius</td>
-                <td><input data-key="firstPassClusterCount" value="max(60, N / 1000)"></td>
-            </tr>
-            <tr>
-                <td>Antrojo grupavimo grupių skaičius</td>
-                <td><input data-key="secondPassClusterCount" value="max(20, N / 3000)"></td>
-            </tr>
-            <tr>
                 <td>Maksimalus aktualių morfemų skaičius</td>
                 <td><input data-key="pruningThreshold" value="2000"></td>
-            </tr>
-            <tr>
-                <td>Morfotaktinių ryšių įtraukties koeficientas</td>
-                <td><input data-key="successorThresholdFactor" value="max(5, N / 5000)"></td>
             </tr>
             <tr>
                 <td>Apmokymui skirta teksto proporcija (M : 1)</td>
@@ -390,7 +372,7 @@
             </tr>
             <tr>
                 <td>Generuotinų naujadarų skaičius</td>
-                <td><input data-key="numWordsToInvent" value="10000"></td>
+                <td><input data-key="numWordsToInvent" value="1000"></td>
             </tr>
             <!-- <tr>
                 <td>Klasės uždarumo slenksčio koeficientas</td>
@@ -409,16 +391,18 @@
             <li data-task="getBigrams">Sužymėti galimų morfemų kaimynystę</li>
             <li data-task="getMorphemes">Paskelbti kandidatines morfemas</li>
             <li data-task="getAdjacencyMatrix">Sudaryti kaimynystės matricą</li>
-            <li class="iteration" data-counter="i">
+            <!--<li data-task="doFirstPassClustering">Sugrupuoti morfemas pagal kaimynystės savybes</li>-->
+            <li data-task="doSecondPassClustering.1">Sugrupuoti morfemas pagal kaimynystės savybes (<span class="progress">0</span>%)</li>
+            <!--<li class="iteration" data-counter="i">
                 <strong>{i} bandymas grupuoti kandidatines morfemas:</strong>
                 <ul>
-                    <li data-task="doFirstPassClustering.{i}">Sugrupuoti morfemas pagal kaimynystės savybes (<span class="progress">0</span>%)</li>
-                    <li data-task="doSecondPassClustering.{i}">Patikslinti morfemų grupavimą</li>
+                    <li data-task="doSecondPassClustering.{i}">Patikslinti morfemų grupavimą (<span class="progress">0</span>%)</li>
                     <li data-task="renumberClusters.{i}">Atnaujinti grupių numeraciją</li>
                     <li data-task="guessClusterTypes.{i}">Nustatyti morfemų grupių tipus</li>
                     <li data-task="inventWords.{i}">Kurti naujadarus (<span class="progress">0</span>%)</li>
                 </ul>
             </li>
+        -->
             <li data-task="generateLayout">Išdėstyti kaimynystės schemą plokštumoje (<span class="progress">0</span>%)</li>
             <li data-task="getRelevantEdges">Išrinkti rodykles iš kaimynystės matricos (<span class="progress">0</span>%)</li>
             <li data-task="render">Nupiešti kaimynystės diagramas (<span class="progress">0</span>%)</li>
