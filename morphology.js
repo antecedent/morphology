@@ -13,6 +13,7 @@ Morphology = {
     commutationAnomalyFactor: 3,
     trainingSetProportion: 5,
     maxNumPrimaryCommutations: 3000,
+    clusteringIntensity: 100,
 
     shuffle: (array) => {
         var result = Array.from(array);
@@ -446,8 +447,8 @@ Morphology = {
             }
         }
 
-        var numOuterIterations = 10;
-        var numInnerIterations = numFirstPassClusters;
+        var numOuterIterations = 1;
+        var numInnerIterations = parseInt(Math.pow(operations.length, Morphology.clusteringIntensity / 100));
 
         var highScore = 0;
         var bestClustering = Array.from(firstPassClusters);

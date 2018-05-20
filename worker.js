@@ -118,6 +118,7 @@ onmessage = (e) => {
             }
         }
         */
+        task('score', () => score);        
         task('renumberClusters', () => [secondPassClusters, numClusters]);
         task('guessClusterTypes', () => morphemeTypes);
         task('inventWords', () => inventedWords);
