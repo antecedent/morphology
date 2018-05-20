@@ -121,12 +121,12 @@
                 } else if (!(validation instanceof Set)) {
                     validation = new Set;
                 }
-                var neologisms = results.inventWords.map((w) => {
+                var neologisms = results.inventWords.filter((w) => !w.startsWith('<timeout:')).map((w) => {
                     if (validation.has(w)) {
                         successRate++;
                         return '<span class="success">' + w + '</span>';
                     }
-                    return w.replace('<', '&lt;').replace('>', '&gt;');
+                    return w;
                 });
                 neologisms.sort();
                 $('.neologisms').html(neologisms.join(', '));
