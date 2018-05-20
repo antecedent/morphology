@@ -458,7 +458,7 @@ Morphology = {
             var score = 0;
             var preResult = [];
             for (var j = 0; j < numInnerIterations; j++) {
-                progressCallback((i * numOuterIterations) + j, numOuterIterations * numInnerIterations);                
+                progressCallback((i * numInnerIterations) + j, numOuterIterations * numInnerIterations);                
                 var op = operations[parseInt(Math.random() * operations.length)];
                 if (op.type == 'merge') {
                     var newClustering = Array.from(lastClustering);
