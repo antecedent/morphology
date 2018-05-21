@@ -236,10 +236,8 @@ Morphology = {
                     if (!byWord.hasOwnProperty(word)) {
                         byWord[word] = new Set;
                     }
-                    if (m != '') {
-                        byWord[word].add(t.indexOf('_'));
-                        byWord[word].add(t.indexOf('_') + m.length);
-                    }
+                    byWord[word].add(t.indexOf('_'));
+                    byWord[word].add(t.indexOf('_') + m.length);
                 }
             }
         }
@@ -256,7 +254,7 @@ Morphology = {
             for (var i = 1; i < offsets.length; i++) {
                 var m = w.substring(offsets[i - 1], offsets[i]);
                 if (last != null) {
-                    key = last + ':' + m;
+                    var key = last + ':' + m;
                     if (!preResult.hasOwnProperty(key)) {
                         preResult[key] = new Set;
                     }
@@ -456,6 +454,7 @@ Morphology = {
 
         var preliminaryInfo = Morphology.guessClusterTypes(numFirstPassClusters, firstPassClusters, adjacencyMatrix, morphemeMapping, commutations);
 
+
         for (var i = 0; i < numFirstPassClusters; i++) {
             for (var j = i + 1; j < numFirstPassClusters; j++) {
                 if (i == lb || i == rb || j == lb || j == rb) {
@@ -510,26 +509,26 @@ Morphology = {
                 if (merged.has([op.first, op.second].join(':'))) {
                     continue;
                 }
-                console.log(op.first, op.second, preliminaryInfo[op.first].morphemes[0], preliminaryInfo[op.second].morphemes[0]);
-                console.log('A');
+                //console.log(op.first, op.second, preliminaryInfo[op.first].morphemes[0], preliminaryInfo[op.second].morphemes[0]);
+                //console.log('A');
                 var newClustering = Array.from(lastClustering);
                 for (var k = 0; k < newClustering.length; k++) {
                     if (newClustering[k] == op.second) {
                         newClustering[k] = op.first;
                     }
                 }
-                console.log('B');
+                //console.log('B');
                 var [renumberedClusters, renumberedNumClusters] = Morphology.renumberClusters(newClustering, newClustering.reduce((a, x) => Math.max(a, x), 0) + 1, morphemeMapping);
-                console.log('C');
+                //console.log('C');
                 var clusterInfo = Morphology.guessClusterTypes(renumberedNumClusters, renumberedClusters, adjacencyMatrix, morphemeMapping, commutations);
                 clusterInfo[0].disabled = true;
                 var newScore = 0;
                 var inventions = [];
                 for (var z = 0; z < 1; z++) {
                     var _inventions = Morphology.inventWords(precision, validationWords.size, renumberedNumClusters, clusterInfo, renumberedClusters[morphemeMapping['⋊']], renumberedClusters[morphemeMapping['⋉']], trainingWords, (p, t) => null);
-                    console.log('D');
+                    //console.log('D');
                     var matches = _inventions.filter((w) => validationWords.has(w)).length;
-                    console.log('E');
+                    //console.log('E');
                     var _newScore = 0.5 * (
                         /* precision */ matches /  _inventions.length
                         /* recall */  + matches / validationWords.size
@@ -914,52 +913,57 @@ Morphology = {
         limit = Morphology.minPrecision;
         //console.log(limit, numValidationWords);
         var stateSequences = new Set;
-        var invent = (states) => {
-            var current = states[states.length - 1];
-            if (current == final) {
-                stateSequences.add(states.join(':'));
-                if (states.length > 10) {
-                    console.log(states);
-                    return;
+        var invent = function* (states, max) {
+            if (states.length <= max) {
+                var current = states[states.length - 1];
+                if (current == final && states.length == max) {
+                    yield states;
                 }
-            }
-            for (var successor of clusterInfo[current].successors) {
-                var twoRoots = states.filter((q) => !clusterInfo[q].affix).length > 0 && !clusterInfo[successor].affix;
-                if (!clusterInfo[successor].disabled && !states.includes(successor) && !twoRoots) {
-                    invent(states.concat([successor]))
+                for (var successor of clusterInfo[current].successors) {
+                    var twoRoots = states.filter((q) => !clusterInfo[q].affix).length > 0 && !clusterInfo[successor].affix;
+                    if (!clusterInfo[successor].disabled && !states.includes(successor) && !twoRoots) {
+                        for (var sub of invent(states.concat([successor]), max)) {
+                            yield sub;
+                        }
+                    }
                 }
             }
         };
-        invent([initial]);
-        console.log(stateSequences.size);
+
         var k = 0;
         var result = new Set;
         sequenceLoop:
-        for (var sequenceString of stateSequences) {
-            var sequence = sequenceString.split(':');
-            var oldResult = new Set(['']);
-            for (var state of sequence) {
-                var newResult = new Set;
-                for (var morpheme of clusterInfo[state].morphemes) {
-                    for (var prefix of oldResult) {
-                        newResult.add(prefix + morpheme);
+        for (var max = 3; true; max++) {
+            var empty = true;
+            for (var sequence of invent([initial], max)) {
+                empty = false;
+                var oldResult = new Set(['']);
+                for (var state of sequence) {
+                    var newResult = new Set;
+                    for (var morpheme of clusterInfo[state].morphemes) {
+                        for (var prefix of oldResult) {
+                            newResult.add(prefix + morpheme);
+                        }
                     }
+                    oldResult = newResult;
                 }
-                oldResult = newResult;
+                for (var word of oldResult) {
+                    word = word.substring(1, word.length - 1);
+                    if (words.has(word)) {
+                        continue;
+                    }
+                    result.add(word);
+                    if (numValidationWords / result.size < limit) {
+                        console.log(result.size, limit);
+                        break sequenceLoop;
+                    }
+                    //if (result.size >= Morphology.numWordsToInvent) {
+                        //break sequenceLoop;
+                    //}
+                }
             }
-            for (var word of oldResult) {
-                word = word.substring(1, word.length - 1);
-                if (words.has(word)) {
-                    continue;
-                }
-                result.add(word);
-                if (numValidationWords / result.size < limit) {
-                    console.log(result.size, limit);
-                    break sequenceLoop;
-                }
-                //if (result.size >= Morphology.numWordsToInvent) {
-                    //break sequenceLoop;
-                //}
+            if (empty) {
+                break;
             }
         }
         return Array.from(result);
