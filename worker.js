@@ -75,7 +75,7 @@ onmessage = (e) => {
             progress('doSecondPassClustering.1')
         ));
 
-        var secondPassClusters, numClusters, clusterInfo, inventedWords;
+        //var secondPassClusters, numClusters, clusterInfo, inventedWords;
         var numFirstPassClusters = (new Set(_firstPassClusters)).size;
 
 
