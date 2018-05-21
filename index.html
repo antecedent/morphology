@@ -100,12 +100,16 @@
                     results.getRelevantEdges,
                     results.generateLayout,
                     (image) => {
+                        if (k == 0) {
+                            k++;
+                            return;
+                        }
                         var hue = parseInt(33 * (k % 10));
                         var div = $('<div class="cluster">').appendTo($('.results-section'));
                         var img = $('<img>').attr('src', image).attr('width', 200).attr('height', 200);
                         var a = $('<a>').attr('href', image).append(img).appendTo(div);
                         new Luminous(a[0]);
-                        var h3 = $('<h3>' + (k + 1) + ' grupė <span style="color: hsl(' + hue + ', 100%, 50%);">&bull;</span></h3>').appendTo(div);
+                        var h3 = $('<h3>' + k + ' grupė <span style="color: hsl(' + hue + ', 100%, 50%);">&bull;</span></h3>').appendTo(div);
                         //$('<p><em>' + (results.guessClusterTypes[k].open ? 'Atvira klasė' : 'Uždara klasė') + '</em></p>').appendTo(div);
                         var p = $('<p>' + results.guessClusterTypes[k].morphemes.join(', ') + '</p>').appendTo(div);
                         k++;
@@ -146,7 +150,7 @@
                 var min = Math.min;
                 var N = new Set(text.toLowerCase().split(/\s+/)).size;
                 $('.parameters-section input').each(function () {
-                    parameters[$(this).data('key')] = parseInt(eval($(this).val()));
+                    parameters[$(this).data('key')] = parseInt($(this).val());
                     if (isNaN(parameters[$(this).data('key')])) {
                         return;
                     }
@@ -343,40 +347,32 @@
                 <td><input type="number" data-key="edgeThresholdFactor" value="5"></td>
             </tr> -->
             <tr>
-                <td>Žodžių skaičius tekste</td>
-                <td><input readonly value="N"></td>
-            </tr>
-            <tr>
                 <td>Įsimintinų raidžių samplaikų skaičius</td>
-                <td><input data-key="numSalientSubstrings" value="3000"></td>
+                <td><input data-key="numSalientSubstrings" type="number" value="3000"></td>
             </tr>
             <tr>
                 <td>Idealus įsimintinos samplaikos ilgis</td>
-                <td><input data-key="preferredMorphemeLength" value="3"></td>
+                <td><input data-key="preferredMorphemeLength" type="number" value="3"></td>
             </tr>
             <tr>
                 <td>Minimalus komutaciją įrodančių žodžių skaičius</td>
-                <td><input data-key="minCommutationStrength" value="max(20, N / 500)"></td>
+                <td><input data-key="minCommutationStrength" type="number" value="100"></td>
             </tr>
             <tr>
                 <td>Maksimalus komutacijų skaičius iki tikslinimo</td>
-                <td><input data-key="maxNumPrimaryCommutations" value="3000"></td>
+                <td><input data-key="maxNumPrimaryCommutations" type="number" value="3000"></td>
             </tr>
             <tr>
                 <td>Maksimalus aktualių morfemų skaičius</td>
-                <td><input data-key="pruningThreshold" value="2000"></td>
+                <td><input data-key="pruningThreshold" type="number" value="2000"></td>
             </tr>
             <tr>
                 <td>Apmokymui skirta teksto proporcija (M : 1)</td>
-                <td><input data-key="trainingSetProportion" value="1"></td>
-            </tr>
-            <tr>
-                <td>Generuotinų naujadarų skaičius</td>
-                <td><input data-key="numWordsToInvent" value="1000"></td>
+                <td><input data-key="trainingSetProportion" type="number" value="1"></td>
             </tr>
             <tr>
                 <td>Grupavimo išsamumas (nuo 0 iki 100)</td>
-                <td><input data-key="clusteringIntensity" value="50" min="0" max="100" type="number"></td>
+                <td><input data-key="clusteringIntensity" value="75" min="0" max="100" type="number"></td>
             </tr>
             <!-- <tr>
                 <td>Klasės uždarumo slenksčio koeficientas</td>
@@ -394,7 +390,7 @@
             <li data-task="refineCommutations">Patikslinti komutacijų testų rezultatus (<span class="progress">0</span>%)</li>
             <li data-task="getBigrams">Sužymėti galimų morfemų kaimynystę</li>
             <li data-task="getMorphemes">Paskelbti kandidatines morfemas</li>
-            <li data-task="getAdjacencyMatrix">Sudaryti kaimynystės matricą</li>
+            <li data-task="getAdjacencyMatrix">Sudaryti kaimynystės matricą (<span class="progress">0</span>%)</li>
             <!--<li data-task="doFirstPassClustering">Sugrupuoti morfemas pagal kaimynystės savybes</li>-->
             <li data-task="doSecondPassClustering.1">Sugrupuoti morfemas pagal kaimynystės savybes (<span class="progress">0</span>%)</li>
             <!--<li class="iteration" data-counter="i">
