@@ -38,12 +38,12 @@ onmessage = (e) => {
     }
     try {
         var preliminaryWords = e.data.text.split(/\s+/);
-        var trainingSetPivot = parseInt(preliminaryWords.length / (Morphology.trainingSetProportion + 1) * Morphology.trainingSetProportion);
+        var trainingSetPivot = Math.floor(preliminaryWords.length / (Morphology.trainingSetProportion + 1));
         var trainingSet = preliminaryWords.slice(0, trainingSetPivot).join(' ');
         var validationSet = preliminaryWords.slice(trainingSetPivot).join(' ');
         var words = task('extractWords', () => Morphology.extractWords(trainingSet));
         var validationWords = Morphology.extractWords(validationSet);
-        for (var word of validationWords) {
+        for (var word of Array.from(validationWords)) {
             if (words.has(word)) {
                 validationWords.delete(word);
             }
@@ -59,7 +59,7 @@ onmessage = (e) => {
         var bigrams = task('getBigrams', () => Morphology.getBigrams(commutations));
         var morphemes = task('getMorphemes', () => Morphology.getMorphemes(bigrams));
         var [adjacencyMatrix, morphemeMapping, relevantMorphemes] = task('getAdjacencyMatrix', () => Morphology.getAdjacencyMatrix(bigrams, morphemes, commutations, trainingSet.toLowerCase(), progress('getAdjacencyMatrix')));
-        var _firstPassClusters = task('doFirstPassClustering', () => Morphology.doFirstPassClustering(
+        var [_firstPassClusters, signatures] = task('doFirstPassClustering', () => Morphology.doFirstPassClustering(
             adjacencyMatrix,
             relevantMorphemes,
             commutations,
@@ -72,6 +72,7 @@ onmessage = (e) => {
             validationWords,
             morphemeMapping,
             commutations,
+            signatures,
             progress('doSecondPassClustering.1')
         ));
 

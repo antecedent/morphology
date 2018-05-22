@@ -144,17 +144,28 @@
                 }
             };
 
+            var hash = (text) => [
+                text.length,
+                text.substring(0, 1000),
+                text.substring(text.length - 1000, text.length),
+                parameters.numSalientSubstrings,
+                parameters.preferredMorphemeLength,
+                parameters.minCommutationStrength,
+                parameters.maxNumPrimaryCommutations
+            ].join(':');
+
             var run = (text) => {
                 window.parameters = {};
-                var max = Math.max;
-                var min = Math.min;
-                var N = new Set(text.toLowerCase().split(/\s+/)).size;
                 $('.parameters-section input').each(function () {
                     parameters[$(this).data('key')] = parseInt($(this).val());
                     if (isNaN(parameters[$(this).data('key')])) {
                         return;
                     }
                 });
+                var textKey = hash(text);
+                if (localStorage.getItem(textKey)) {
+                    parameters.commutations = JSON.parse(localStorage.getItem(textKey));
+                }
                 // var iterator = $('.iteration');
                 // for (var i = parseInt(Math.log(parameters.pruningThreshold) / Math.log(3)) + 5; i > 0; i--) {
                 //     $(iterator[0].outerHTML.replace(new RegExp('{' + iterator.data('counter') + '}', 'g'), i)).insertAfter(iterator);
@@ -174,6 +185,9 @@
                         element.find('.progress').text('100');
                         var key = e.data.task.replace(/\.\d+$/, '');
                         results[key] = e.data.result;
+                        if (e.data.task == 'refineCommutations') {
+                            localStorage.setItem(textKey, JSON.stringify(e.data.result.map((c) => [Array.from(c[0]), c[1], c[2]])));
+                        }
                         if (e.data.task == 'ready') {
                             showResults();
                         }
@@ -367,12 +381,12 @@
                 <td><input data-key="pruningThreshold" type="number" value="2000"></td>
             </tr>
             <tr>
-                <td>Apmokymui skirta teksto proporcija (M : 1)</td>
+                <td>Validavimui skirta teksto proporcija (1 : M)</td>
                 <td><input data-key="trainingSetProportion" type="number" value="1"></td>
             </tr>
             <tr>
                 <td>Grupavimo išsamumas (nuo 0 iki 100)</td>
-                <td><input data-key="clusteringIntensity" value="75" min="0" max="100" type="number"></td>
+                <td><input data-key="clusteringIntensity" value="50" min="0" max="100" type="number"></td>
             </tr>
             <!-- <tr>
                 <td>Klasės uždarumo slenksčio koeficientas</td>
