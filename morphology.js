@@ -636,7 +636,7 @@ Morphology = {
             return size * (1 - difference);
         };
 
-        affixOperations = Morphology.shuffle(affixOperations);
+        [affixOperations, _] = Morphology.shuffle(affixOperations);
         rootOperations.sort((l, r) => rootUrgency(r) - rootUrgency(l));
 
         var originalOperations = affixOperations.concat(rootOperations);
@@ -720,16 +720,11 @@ Morphology = {
                         }
                     }
 
+                    console.log(`High score: ${(newScore * 100).toFixed(2)}% (gain = ${((newScore - score) * 100).toFixed(2)}%); merging clusters {${preliminaryInfo[op.first].morphemes.slice(0, 4).join(', ')}} and {${preliminaryInfo[op.second].morphemes.slice(0, 4).join(', ')}}.`);
+
                     gains.push([newScore - score, j]);
                     score = newScore;
                     lastClustering = newClustering;
-
-                    if (newScore - highScore >= Morphology.minGain) {
-                        console.log(`High score: ${(newScore * 100).toFixed(2)}%; gain = ${((newScore - highScore) * 100).toFixed(2)}%`);
-                        console.log(`\tConsidering merging clusters {${preliminaryInfo[op.first].morphemes.slice(0, 4).join(', ')}} and {${preliminaryInfo[op.second].morphemes.slice(0, 4).join(', ')}}`);
-                        highScore = newScore;
-                        bestClustering = Array.from(newClustering);
-                    }
 
                     merged.add([op.first, op.second].join(':'));
                     if (index.hasOwnProperty(op.second)) {
@@ -744,6 +739,8 @@ Morphology = {
                             }
                         }
                     }
+                } else {
+                    console.log(`Loss (or insufficient gain) of ${((newScore - score) * 100).toFixed(2)}% avoided by not merging clusters {${preliminaryInfo[op.first].morphemes.slice(0, 4).join(', ')}} and {${preliminaryInfo[op.second].morphemes.slice(0, 4).join(', ')}}.`);
                 }
             }
         //}
@@ -770,7 +767,7 @@ Morphology = {
             var operations = originalOperations.map((op) => ({type: op.type, first: op.first, second: op.second}));
 
             var history = [];
-            progressCallback(1 + (i++ / subsets.length), 2.02);
+            progressCallback(1.02 + (i++ / subsets.length), 2);
             //console.log(subset);
             var index = {};
             for (var j = 0; j < operations.length; j++) {
