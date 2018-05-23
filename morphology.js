@@ -636,6 +636,7 @@ Morphology = {
             return size * (1 - difference);
         };
 
+        affixOperations = Morphology.shuffle(affixOperations);
         rootOperations.sort((l, r) => rootUrgency(r) - rootUrgency(l));
 
         var originalOperations = affixOperations.concat(rootOperations);
