@@ -51,7 +51,6 @@ onmessage = (e) => {
         task('getValidationSet', () => validationWords);
         var [wordsWithBoundaries, prefixTree, wordArray] = task('addBoundaryChars', () => Morphology.addBoundaryChars(words, progress('addBoundaryChars')));
         var substrings = task('getSalientSubstrings', () => Morphology.getSalientSubstrings(wordsWithBoundaries));
-
         preliminaryWords = [];
 
         var commutations = task('commute', () => Morphology.commute(substrings, wordsWithBoundaries, prefixTree, wordArray, progress('commute')));

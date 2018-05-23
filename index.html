@@ -146,18 +146,22 @@
 
             var hash = (text) => [
                 text.length,
-                text.substring(0, 1000),
-                text.substring(text.length - 1000, text.length),
+                text.substring(0, 1000).replace(/:/g, ''),
+                text.substring(text.length - 1000, text.length).replace(/:/g, ''),
                 parameters.numSalientSubstrings,
                 parameters.preferredMorphemeLength,
                 parameters.minCommutationStrength,
-                parameters.maxNumPrimaryCommutations
+                parameters.maxNumPrimaryCommutations,
+                parameters.trainingSetProportion
             ].join(':');
 
             var run = (text) => {
                 window.parameters = {};
                 $('.parameters-section input').each(function () {
                     parameters[$(this).data('key')] = parseInt($(this).val());
+                    if ($(this).is('[type=checkbox]')) {
+                        parameters[$(this).data('key')] = $(this).is(':checked');
+                    }
                     if (isNaN(parameters[$(this).data('key')])) {
                         return;
                     }
@@ -186,7 +190,11 @@
                         var key = e.data.task.replace(/\.\d+$/, '');
                         results[key] = e.data.result;
                         if (e.data.task == 'refineCommutations') {
-                            localStorage.setItem(textKey, JSON.stringify(e.data.result.map((c) => [Array.from(c[0]), c[1], c[2]])));
+                            try {
+                                localStorage.setItem(textKey, JSON.stringify(e.data.result.map((c) => [Array.from(c[0]), c[1], c[2]])));
+                            } catch (error) {
+                                localStorage.clear();
+                            }
                         }
                         if (e.data.task == 'ready') {
                             showResults();
@@ -387,6 +395,10 @@
             <tr>
                 <td>Grupavimo išsamumas (nuo 0 iki 100)</td>
                 <td><input data-key="clusteringIntensity" value="50" min="0" max="100" type="number"></td>
+            </tr>
+            <tr>
+                <td>Negrupuoti, jei pažeidžiama fonotaktika</td>
+                <td><input data-key="respectPhonotactics" type="checkbox"></td>
             </tr>
             <!-- <tr>
                 <td>Klasės uždarumo slenksčio koeficientas</td>
