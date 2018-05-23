@@ -1,11 +1,14 @@
 importScripts('morphology.js');
 importScripts('https://www.lactame.com/lib/ml/3.2.0/ml.min.js');
 
-var progress = (task) => (done, total) => {
+var progress = (task, precision) => (done, total) => {
+    if (!precision) {
+        precision = 0;
+    }
     postMessage({
         task: task,
         state: 'progress',
-        progress: parseInt(100 * done / total)
+        progress: (100 * done / total).toFixed(precision)
     });
 };
 
@@ -38,7 +41,7 @@ onmessage = (e) => {
     }
     try {
         var preliminaryWords = e.data.text.split(/\s+/);
-        var trainingSetPivot = Math.floor(preliminaryWords.length / (Morphology.trainingSetProportion + 1));
+        var trainingSetPivot = Math.floor(preliminaryWords.length / (Morphology.trainingSetProportion + 1) * (Morphology.trainingSetProportion));
         var trainingSet = preliminaryWords.slice(0, trainingSetPivot).join(' ');
         var validationSet = preliminaryWords.slice(trainingSetPivot).join(' ');
         var words = task('extractWords', () => Morphology.extractWords(trainingSet));
@@ -49,10 +52,10 @@ onmessage = (e) => {
             }
         }
         task('getValidationSet', () => validationWords);
-        var [wordsWithBoundaries, prefixTree, wordArray] = task('addBoundaryChars', () => Morphology.addBoundaryChars(words, progress('addBoundaryChars')));
+        var wordsWithBoundaries = task('addBoundaryChars', () => Morphology.addBoundaryChars(words));
+        var [prefixTree, wordArray] = task('makePrefixTree', () => Morphology.makePrefixTree(wordsWithBoundaries, progress('makePrefixTree')));
         var substrings = task('getSalientSubstrings', () => Morphology.getSalientSubstrings(wordsWithBoundaries));
         preliminaryWords = [];
-
         var commutations = task('commute', () => Morphology.commute(substrings, wordsWithBoundaries, prefixTree, wordArray, progress('commute')));
         commutations = task('refineCommutations', () => Morphology.refineCommutations(commutations, prefixTree, wordArray, progress('refineCommutations')));
         var bigrams = task('getBigrams', () => Morphology.getBigrams(commutations));
@@ -72,7 +75,7 @@ onmessage = (e) => {
             morphemeMapping,
             commutations,
             signatures,
-            progress('doSecondPassClustering.1')
+            progress('doSecondPassClustering.1', 2)
         ));
 
         //var secondPassClusters, numClusters, clusterInfo, inventedWords;
