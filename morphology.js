@@ -1176,7 +1176,7 @@ Morphology = {
             }
         }
         //console.log(total, Array.from(validationWords).filter((w) => explain('⋊' + w + '⋉', initial, false)));
-        return 0.5 * (explained / total + explained / validationWords.size);
+        return 0.5 * (explained / Math.max(total, 1) + explained / validationWords.size);
     },
 
     getInventedWords: (limit, validationWords, clusterInfo, initial, final, words) => {
