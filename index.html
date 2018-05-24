@@ -394,11 +394,19 @@
             </tr>
             <tr>
                 <td>Grupavimo operacijų skaičius</td>
-                <td><input data-key="numClusteringOperations" type="number" value="10000"></td>
+                <td><input data-key="numClusteringOperations" type="number" value="3000"></td>
+            </tr>
+            <tr>
+                <td>Preciziškumo ir atgaminimo santykinė svarba</td>
+                <td><input data-key="precisionMultiplier" type="number" value="1"> : <input data-key="recallMultiplier" type="number" value="3"></td>
             </tr>
             <tr>
                 <td>Negrupuoti, jei pažeidžiama fonotaktika</td>
-                <td><input data-key="respectPhonotactics" type="checkbox"></td>
+                <td><input data-key="respectPhonotactics" checked type="checkbox"></td>
+            </tr>
+            <tr>
+                <td>Perrinkti grupavimo sprendimų poaibius</td>
+                <td><input data-key="checkSubsets" type="checkbox"></td>
             </tr>
             <!-- <tr>
                 <td>Klasės uždarumo slenksčio koeficientas</td>

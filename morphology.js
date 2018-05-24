@@ -16,8 +16,11 @@ Morphology = {
     minPrecision: 0.01,
     minGain: 0.001,
     commutations: [],
+    checkSubsets: false,
     respectPhonotactics: false,
     numClusteringOperations: 10000,
+    precisionMultiplier: 1,
+    recallMultiplier: 1,
 
     product: function* (iterable, n) {
         if (n > 0) {
@@ -667,7 +670,11 @@ Morphology = {
         var visited = new Set;
         operationLoop:
         for (var j = 0; j < numInnerIterations; j++) {
-            progressCallback(j / numInnerIterations + 0.02, 2);
+            if (Morphology.checkSubsets) {
+                progressCallback(j / numInnerIterations + 0.02, 2);
+            } else {
+                progressCallback(0.99 * (j / numInnerIterations) + 0.01, 1);
+            }
             var op = operations[j];
             if (op.first == op.second) {
                 continue;
@@ -709,6 +716,10 @@ Morphology = {
                 gains.push([newScore - score, j]);
                 score = newScore;
                 lastClustering = newClustering;
+                if (!Morphology.checkSubsets) {
+                    bestClustering = newClustering;
+                    highScore = newScore;
+                }
                 bestClusterInfo = Morphology.copyClusterInfo(clusterInfo);
 
                 if (index.hasOwnProperty(op.second)) {
@@ -726,79 +737,81 @@ Morphology = {
                         }
                     }
                 }
-            } else {
-                console.log(`Loss (or insufficient gain) of ${((newScore - score) * 100).toFixed(2)}% avoided by not merging clusters {${bestClusterInfo[op.first].morphemes.slice(0, 4).join(', ')}} and {${bestClusterInfo[op.second].morphemes.slice(0, 4).join(', ')}}.`);
             }
         }
+        if (Morphology.checkSubsets) {
+            gains.sort((l, r) => r[0] - l[0]);
+            highScore = Morphology.inventWords(validationPrefixTree, validationWords.size, preliminaryInfo, lb, rb, trainingWords);
+            bestClustering = Array.from(firstPassClusters);
+            var bestHistory = [];
 
-        gains.sort((l, r) => r[0] - l[0]);
-        highScore = Morphology.inventWords(validationPrefixTree, validationWords.size, preliminaryInfo, lb, rb, trainingWords);
-        bestClustering = Array.from(firstPassClusters);
-        var bestHistory = [];
-
-        for (var i = 0; i < gains.length; i++) {
-            if (Morphology.subsets(i).map((s) => s.length).reduce((a, x) => a + x, 0) > numInnerIterations) {
-                break;
-            }
-        }
-        gains = gains.slice(0, i);
-        var i = 0;
-
-        var subsets = Morphology.subsets(gains.length);
-        for (var subset of subsets) {
-
-            var operations = originalOperations.map((op) => ({type: op.type, first: op.first, second: op.second}));
-            var clusterInfo = Morphology.copyClusterInfo(preliminaryInfo);
-
-            var history = [];
-            progressCallback(1.02 + (i++ / subsets.length) * 0.98, 2);
-            var index = {};
-            for (var j = 0; j < operations.length; j++) {
-                var op = operations[j];
-                for (var c of [op.first, op.second]) {
-                    if (!index.hasOwnProperty(c)) {
-                        index[c] = [];
-                    }
-                    index[c].push(j);
+            for (var i = 0; i < gains.length; i++) {
+                if (Morphology.subsets(i).map((s) => s.length).reduce((a, x) => a + x, 0) > numInnerIterations) {
+                    break;
                 }
             }
-            var lastClustering = Array.from(firstPassClusters);
-            var score = Morphology.inventWords(validationPrefixTree, validationWords.size, preliminaryInfo, lb, rb, trainingWords);
-            var gainsSubset = subset.map((s) => gains[s]);
-            var precision = 0;
-            for (var [gain, j] of gainsSubset) {
-                var op = operations[j];
-                var newClustering = Array.from(lastClustering);
-                for (var k = 0; k < newClustering.length; k++) {
-                    if (newClustering[k] == op.second) {
-                        newClustering[k] = op.first;
-                    }
-                }
-                var [renumberedClusters, renumberedNumClusters] = Morphology.renumberClusters(newClustering, newClustering.reduce((a, x) => Math.max(a, x), 0) + 1, morphemeMapping);
-                Morphology.updateClusterInfo(clusterInfo, op);
-                var newScore = Morphology.inventWords(validationPrefixTree, validationWords.size, clusterInfo, renumberedClusters[morphemeMapping['⋊']], renumberedClusters[morphemeMapping['⋉']], trainingWords);
-                history.push([preliminaryInfo[op.first].morphemes[0], preliminaryInfo[op.second].morphemes[0]]);
-                lastClustering = newClustering;
-                score = newScore;
-                if (index.hasOwnProperty(op.second)) {
-                    for (var k of Array.from(index[op.second])) {
-                        if (operations[k].first == op.second) {
-                            operations[k].first = op.first;
-                            index[op.first].push(k);
+            gains = gains.slice(0, i);
+            var i = 0;
+
+            var subsets = Morphology.subsets(gains.length);
+            for (var subset of subsets) {
+
+                var operations = originalOperations.map((op) => ({type: op.type, first: op.first, second: op.second}));
+                var clusterInfo = Morphology.copyClusterInfo(preliminaryInfo);
+
+                var history = [];
+                progressCallback(1.02 + (i++ / subsets.length) * 0.98, 2);
+                var index = {};
+                for (var j = 0; j < operations.length; j++) {
+                    var op = operations[j];
+                    for (var c of [op.first, op.second]) {
+                        if (!index.hasOwnProperty(c)) {
+                            index[c] = new Set;
                         }
-                        if (operations[k].second == op.second) {
-                            operations[k].second = op.first;
-                            index[op.first].push(k);
+                        index[c].add(j);
+                    }
+                }
+                var lastClustering = Array.from(firstPassClusters);
+                var score = Morphology.inventWords(validationPrefixTree, validationWords.size, preliminaryInfo, lb, rb, trainingWords);
+                var gainsSubset = subset.map((s) => gains[s]);
+                var precision = 0;
+                for (var [gain, j] of gainsSubset) {
+                    var op = operations[j];
+                    var newClustering = Array.from(lastClustering);
+                    for (var k = 0; k < newClustering.length; k++) {
+                        if (newClustering[k] == op.second) {
+                            newClustering[k] = op.first;
                         }
                     }
+                    var [renumberedClusters, renumberedNumClusters] = Morphology.renumberClusters(newClustering, newClustering.reduce((a, x) => Math.max(a, x), 0) + 1, morphemeMapping);
+                    Morphology.updateClusterInfo(clusterInfo, op);
+                    var newScore = Morphology.inventWords(validationPrefixTree, validationWords.size, clusterInfo, renumberedClusters[morphemeMapping['⋊']], renumberedClusters[morphemeMapping['⋉']], trainingWords);
+                    history.push([preliminaryInfo[op.first].morphemes[0], preliminaryInfo[op.second].morphemes[0]]);
+                    lastClustering = newClustering;
+                    score = newScore;
+                    if (index.hasOwnProperty(op.second)) {
+                        for (var k of Array.from(index[op.second])) {
+                            if (operations[k] == op) {
+                                continue;
+                            }
+                            if (operations[k].first == op.second) {
+                                operations[k].first = op.first;
+                                index[op.first].add(k);
+                            }
+                            if (operations[k].second == op.second) {
+                                operations[k].second = op.first;
+                                index[op.first].add(k);
+                            }
+                        }
+                    }
                 }
-            }
-            if (score - highScore >= Morphology.minGain) {
-                console.log(`High score (subset selection): ${(score * 100).toFixed(2)}%; gain = ${((score - highScore) * 100).toFixed(2)}%`);
-                highScore = score;
-                bestClustering = lastClustering;
-                bestHistory = history;
-                bestClusterInfo = clusterInfo;
+                if (score - highScore >= Morphology.minGain) {
+                    console.log(`High score (subset selection): ${(score * 100).toFixed(2)}%; gain = ${((score - highScore) * 100).toFixed(2)}%`);
+                    highScore = score;
+                    bestClustering = lastClustering;
+                    bestHistory = history;
+                    bestClusterInfo = clusterInfo;
+                }
             }
         }
         var inventions = Morphology.getInventedWords(validationWords.size * 2, validationPrefixTree, validationWords.size, bestClusterInfo, null, null, trainingWords);
@@ -1176,7 +1189,7 @@ Morphology = {
         }
         var total = final.numEndingPaths;
         var explained = final.explanations.size;
-        return 0.5 * (explained / total + explained / numValidationWords);
+        return (1 / (Morphology.precisionMultiplier + Morphology.recallMultiplier)) * (Morphology.precisionMultiplier * explained / total + Morphology.recallMultiplier * explained / numValidationWords);
     },
 
     getInventedWords: (limit, validationPrefixTree, numValidationWords, clusterInfo, initial, final, words) => {
