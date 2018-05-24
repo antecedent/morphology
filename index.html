@@ -110,8 +110,8 @@
                         var a = $('<a>').attr('href', image).append(img).appendTo(div);
                         new Luminous(a[0]);
                         var h3 = $('<h3>' + k + ' grupė <span style="color: hsl(' + hue + ', 100%, 50%);">&bull;</span></h3>').appendTo(div);
-                        //$('<p><em>' + (results.guessClusterTypes[k].open ? 'Atvira klasė' : 'Uždara klasė') + '</em></p>').appendTo(div);
-                        var p = $('<p>' + results.guessClusterTypes[k].morphemes.join(', ') + '</p>').appendTo(div);
+                        //$('<p><em>' + (results.getClusterInfo[k].open ? 'Atvira klasė' : 'Uždara klasė') + '</em></p>').appendTo(div);
+                        var p = $('<p>' + results.getClusterInfo[k].morphemes.join(', ') + '</p>').appendTo(div);
                         k++;
                     }
                 );
@@ -393,8 +393,8 @@
                 <td><input data-key="trainingSetProportion" type="number" value="1"></td>
             </tr>
             <tr>
-                <td>Grupavimo išsamumas (nuo 0 iki 100)</td>
-                <td><input data-key="clusteringIntensity" value="50" min="0" max="100" type="number"></td>
+                <td>Grupavimo operacijų skaičius</td>
+                <td><input data-key="numClusteringOperations" type="number" value="10000"></td>
             </tr>
             <tr>
                 <td>Negrupuoti, jei pažeidžiama fonotaktika</td>
@@ -410,7 +410,8 @@
         <h2>Eiga</h2>
         <ul class="tasks">
             <li data-task="extractWords">Išrinkti žodžius</li>
-            <li data-task="makePrefixTree">Sudaryti duomenų struktūrą žodžių paieškai (<span class="progress">0</span>%)</li>
+            <li data-task="makePrefixTree">Sudaryti duomenų struktūrą apmokymui skirtų žodžių paieškai (<span class="progress">0</span>%)</li>
+            <li data-task="makeValidationPrefixTree">Sudaryti duomenų struktūrą vertinimui skirtų žodžių paieškai (<span class="progress">0</span>%)</li>
             <li data-task="getSalientSubstrings">Rasti dažnai pasikartojančias raidžių samplaikas</li>
             <li data-task="commute">Atlikti komutacijų testus (<span class="progress">0</span>%)</li>
             <li data-task="refineCommutations">Patikslinti komutacijų testų rezultatus (<span class="progress">0</span>%)</li>
@@ -424,7 +425,7 @@
                 <ul>
                     <li data-task="doSecondPassClustering.{i}">Patikslinti morfemų grupavimą (<span class="progress">0</span>%)</li>
                     <li data-task="renumberClusters.{i}">Atnaujinti grupių numeraciją</li>
-                    <li data-task="guessClusterTypes.{i}">Nustatyti morfemų grupių tipus</li>
+                    <li data-task="getClusterInfo.{i}">Nustatyti morfemų grupių tipus</li>
                     <li data-task="inventWords.{i}">Kurti naujadarus (<span class="progress">0</span>%)</li>
                 </ul>
             </li>

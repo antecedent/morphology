@@ -54,6 +54,7 @@ onmessage = (e) => {
         task('getValidationSet', () => validationWords);
         var wordsWithBoundaries = task('addBoundaryChars', () => Morphology.addBoundaryChars(words));
         var [prefixTree, wordArray] = task('makePrefixTree', () => Morphology.makePrefixTree(wordsWithBoundaries, progress('makePrefixTree')));
+        var [validationPrefixTree, _] = task('makeValidationPrefixTree', () => Morphology.makePrefixTree(Array.from(validationWords).map((w) => '⋊' + w + '⋉'), progress('makeValidationPrefixTree'), true));
         var substrings = task('getSalientSubstrings', () => Morphology.getSalientSubstrings(wordsWithBoundaries));
         preliminaryWords = [];
         var commutations = task('commute', () => Morphology.commute(substrings, wordsWithBoundaries, prefixTree, wordArray, progress('commute')));
@@ -75,56 +76,28 @@ onmessage = (e) => {
             morphemeMapping,
             commutations,
             signatures,
-            progress('doSecondPassClustering.1', 2)
+            validationPrefixTree,
+            progress('doSecondPassClustering.1', 1)
         ));
-
-        //var secondPassClusters, numClusters, clusterInfo, inventedWords;
         var numFirstPassClusters = (new Set(_firstPassClusters)).size;
-
-
-
-        /*
-        var score = 0;
-        var z = 1;
-        var _window = [];
-        var left = 1;
-        var right = numFirstPassClusters;
-        for (var i = 1; Math.abs(right - left) > 2; i++) {
-            console.log(left, right);
-            var [leftThird, rightThird] = [parseInt(left + (right - left) / 3), parseInt(right - (right - left) / 3)];
-            var [fLeftThird, fRightThird] = [leftThird, rightThird].map((k) => {
-                var scores = [];
-                for (var j = 1; j <= 10; j++) {
-                    Morphology.secondPassClusterCount = parseInt((left + right) / 2);
-                    var _secondPassClusters = task('doSecondPassClustering.' + i, () => Morphology.doSecondPassClustering(adjacencyMatrix, _firstPassClusters, progress('doSecondPassClustering.' + i)));
-                    var _numClusters;
-                    [_secondPassClusters, _numClusters] = task('renumberClusters.' + i, () => Morphology.renumberClusters(_secondPassClusters, Morphology.secondPassClusterCount, morphemeMapping));
-                    var _clusterInfo = task('guessClusterTypes.' + i, () => Morphology.guessClusterTypes(_numClusters, _secondPassClusters, adjacencyMatrix, morphemeMapping));
-                    var _inventedWords = task('inventWords.' + i, () => Morphology.inventWords(_numClusters, _clusterInfo, _secondPassClusters[morphemeMapping['⋊']], _secondPassClusters[morphemeMapping['⋉']], words, progress('inventWords.' + i)));
-                    var _score = _inventedWords.filter((w) => validationWords.has(w)).length / Morphology.numWordsToInvent;
-                    task('score.' + i, () => score);
-                    if (_score / k >= score / z) {
-                        secondPassClusters = _secondPassClusters;
-                        numClusters = _numClusters;
-                        clusterInfo = _clusterInfo;
-                        inventedWords = _inventedWords;
-                        score = _score;
-                        z = k;
-                    }
-                    scores.push(_score / k);
-                }
-                return scores.reduce((a, x) => Math.max(a, x), 0);
-            });
-            if (fLeftThird < fRightThird) {
-                left = leftThird;
-            } else {
-                right = rightThird;
-            }
-        }
-        */
         task('score', () => score);
-        task('renumberClusters', () => [secondPassClusters, numClusters]);
-        task('guessClusterTypes', () => clusterInfo);
+        var translation = {};
+        [secondPassClusters, numClusters] = task('renumberClusters', () => Morphology.renumberClusters(secondPassClusters, numClusters, morphemeMapping, translation));
+        clusterInfo = task('getClusterInfo', () => {
+            var redundant = Morphology.copyClusterInfo(clusterInfo);
+            var result = [];
+            var visited = new Set;
+            result.fill(null, 0, numClusters);
+            for (var cluster of redundant) {
+                if (visited.has(cluster.id)) {
+                    continue;
+                }
+                visited.add(cluster.id);
+                result[translation[cluster.id]] = cluster;
+                cluster.id = translation[cluster.id];
+            }
+            return result;
+        });
         inventedWords.sort();
         task('inventWords', () => inventedWords);
         var layout = task('generateLayout', () => Morphology.generateLayout(Object.keys(morphemeMapping).length, secondPassClusters, numClusters, clusterInfo, e.data.canvasWidth, e.data.canvasHeight, e.data.vertexRadius, progress('generateLayout')));
