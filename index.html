@@ -394,15 +394,15 @@
             </tr>
             <tr>
                 <td>Grupavimo operacijų skaičius</td>
-                <td><input data-key="numClusteringOperations" type="number" value="3000"></td>
+                <td><input data-key="numClusteringOperations" type="number" value="300"></td>
             </tr>
             <tr>
                 <td>Preciziškumo ir atgaminimo santykinė svarba</td>
-                <td><input data-key="precisionMultiplier" type="number" value="1"> : <input data-key="recallMultiplier" type="number" value="3"></td>
+                <td><input data-key="precisionMultiplier" type="number" value="1"> : <input data-key="recallMultiplier" type="number" value="1"></td>
             </tr>
             <tr>
-                <td>Negrupuoti, jei pažeidžiama fonotaktika</td>
-                <td><input data-key="respectPhonotactics" checked type="checkbox"></td>
+                <td>Nuobauda (%) už fonotaktikos pažeidimą</td>
+                <td><input data-key="phonotacticPenalty" type="number" min="0" max="100" value="5"></td>
             </tr>
             <tr>
                 <td>Perrinkti grupavimo sprendimų poaibius</td>
@@ -454,7 +454,7 @@
         </div>
         <div class="morphotactics">
             <!--<a href="#"><img src="#"></a>-->
-            <h3><span class="success-rate">0</span>% prognozavimo tikslumas</h3>
+            <h3>Modelio įvertis: <span class="success-rate">0</span>%</h3>
             <p><strong>Modelio prognozuojami naujadarai:</strong> <span class="neologisms"></span></p>
         </div>
     </section>

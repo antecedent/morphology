@@ -13,11 +13,10 @@ Morphology = {
     maxNumPrimaryCommutations: 3000,
     clusteringIntensity: 100,
     numSecondPassClusteringOuterIterations: 1,
-    minPrecision: 0.01,
     minGain: 0.001,
     commutations: [],
     checkSubsets: false,
-    respectPhonotactics: false,
+    phonotacticPenalty: 50,
     numClusteringOperations: 10000,
     precisionMultiplier: 1,
     recallMultiplier: 1,
@@ -638,7 +637,7 @@ Morphology = {
 
         var gains = [];
 
-        if (Morphology.respectPhonotactics) {
+        if (Morphology.phonotacticPenalty > 0) {
             var [phonotacticBigrams, phonotacticTrigrams] = Morphology.learnPhonotactics(
                 new Set(
                     Array.from(trainingWords)
@@ -655,6 +654,12 @@ Morphology = {
         var score = highScore;
         var preResult = [];
         var operations = originalOperations.map((op) => ({type: op.type, first: op.first, second: op.second}));
+
+        for (var i = 0; i < numInnerIterations; i++) {
+            var near = Math.floor(numInnerIterations * Math.random())
+            var far = Math.floor(operations.length * Math.pow(Math.random(), 2))
+        }
+
         var lastClustering = Array.from(firstPassClusters);
         var index = {};
         var precision = 0;
@@ -668,6 +673,7 @@ Morphology = {
             }
         }
         var visited = new Set;
+
         operationLoop:
         for (var j = 0; j < numInnerIterations; j++) {
             if (Morphology.checkSubsets) {
@@ -700,12 +706,18 @@ Morphology = {
 
 
             if (newScore - score >= Morphology.minGain) {
-                if (Morphology.respectPhonotactics) {
+                if (Morphology.phonotacticPenalty > 0) {
+                    phonotacticsLoop:
                     for (var invention of Morphology.getInventedWords(validationWords.size * 2, validationPrefixTree, validationWords.size, clusterInfo, renumberedClusters[morphemeMapping['⋊']], renumberedClusters[morphemeMapping['⋉']], trainingWords)) {
                         for (var absence of absences) {
                             if (('⋊' + invention + '⋉').includes(absence)) {
-                                console.log(`${invention} violates *${absence}; not merging clusters {${bestClusterInfo[op.first].morphemes.slice(0, 4).join(', ')}} and {${bestClusterInfo[op.second].morphemes.slice(0, 4).join(', ')}}`);
-                                continue operationLoop;
+                                //console.log(`${invention} violates *${absence}; a penalty will be incurred.`);
+                                newScore *= 1 - (Morphology.phonotacticPenalty / 100);
+                                if (newScore - score < Morphology.minGain) {
+                                    continue operationLoop;
+                                } else {
+                                    break phonotacticsLoop;
+                                }
                             }
                         }
                     }
