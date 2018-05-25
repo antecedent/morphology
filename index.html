@@ -119,6 +119,16 @@
             }, 1000);
 
             window.showResults = () => {
+                function pad (str, max) {
+                    str = str.toString();
+                    return str.length < max ? pad("0" + str, max) : str;
+                }
+                var d = new Date;
+                timeSeries.push({
+                    time: `${d.getFullYear()}-${pad(d.getMonth() + 1, 2)}-${pad(d.getDate(), 2)} ${pad(d.getHours(), 2)}:${pad(d.getMinutes(), 2)}:${pad(d.getSeconds(), 2)}`,
+                    score: results.score * 100
+                });
+
                 if (window.rendering) {
                     if (window.renderingTimeout) {
                         //clearTimeout(window.renderingTimeout);
@@ -189,10 +199,6 @@
                 $('.neologisms').html(neologisms.join(', '));
                 var percentage = results.score * 100;
                 var d = new Date;
-                timeSeries.push({
-                    time: `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()} ${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}`,
-                    score: percentage
-                });
                 $('.success-rate').text(percentage.toFixed(2).replace('.', ','));
                 if (isNaN(percentage)) {
                     $('.morphotactics').hide();
