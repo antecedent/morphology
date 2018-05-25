@@ -103,9 +103,9 @@
 
             window.results = {};
 
-            window.rendering = false;
+            window.requested = {};
 
-            window.renderingTimeout = null;
+            window.rendering = false;
 
             window.firstRendering = true;
 
@@ -118,7 +118,21 @@
                 }]);
             }, 1000);
 
+            window.setInterval(() => {
+                showResults();
+            }, 5000);
+
             window.showResults = () => {
+                if (!results || !results.score) {
+                    return;
+                }
+                if (window.rendering) {
+                    return;
+                }
+                if (window.requested[results.score]) {
+                    return;
+                }
+                window.requested[results.score] = true;
                 function pad (str, max) {
                     str = str.toString();
                     return str.length < max ? pad("0" + str, max) : str;
@@ -128,15 +142,6 @@
                     time: `${d.getFullYear()}-${pad(d.getMonth() + 1, 2)}-${pad(d.getDate(), 2)} ${pad(d.getHours(), 2)}:${pad(d.getMinutes(), 2)}:${pad(d.getSeconds(), 2)}`,
                     score: results.score * 100
                 });
-
-                if (window.rendering) {
-                    if (window.renderingTimeout) {
-                        //clearTimeout(window.renderingTimeout);
-                    } else {
-                        window.renderingTimeout = setTimeout(window.showResults, 5000);
-                    }
-                    return;
-                }
                 window.rendering = true;
                 $('.tasks li[data-task=render]').addClass('progress');
                 var k = 0;
