@@ -115,11 +115,7 @@
                     mode: 'lines',
                     x: timeSeries.map((t) => t.time),
                     y: timeSeries.map((t) => t.score)
-                }], {
-                    yaxis: {
-                        range: [0, 100]
-                    }
-                });
+                }]);
             }, 1000);
 
             window.showResults = () => {
@@ -204,7 +200,7 @@
                 if (isNaN(percentage) || percentage == 0) {
                     $('.divergence-notice').show();
                 }
-                
+
             };
 
             var hash = (text) => [
