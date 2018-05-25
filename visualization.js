@@ -3,6 +3,7 @@ $(() => {
         vertexRadius: 7,
         width: 600,
         height: 600,
+        maxNumClusters: 100,
 
         createImages: (clusters, morphemeMapping, edges, layout, callback) => {
             var numClusters = 0;
@@ -11,7 +12,7 @@ $(() => {
                 numClusters = Math.max(numClusters, c + 1);
             }
             var createImage = (i) => {
-                if (i >= numClusters) {
+                if (i >= Math.min(numClusters, Visualization.maxNumClusters)) {
                     return;
                 }
                 var canvas = Visualization.createHiDPICanvas(Visualization.width, Visualization.height);
