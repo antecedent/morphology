@@ -80,16 +80,6 @@
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/luminous-lightbox/2.0.0/luminous-basic.min.css">
 
-    <!-- Global site tag (gtag.js) - Google Analytics -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-20483190-2"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-
-      gtag('config', 'UA-20483190-2');
-    </script>
-
     <script
       src="https://code.jquery.com/jquery-3.3.1.min.js"
       integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
@@ -99,15 +89,21 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/luminous-lightbox/2.0.0/Luminous.min.js"></script>
     <script>
         $(() => {
+            window.readyToRender = false;
+
             window.timeSeries = [];
 
             window.results = {};
 
-            window.requested = {};
+            window.connectionOpen = false;
 
             window.rendering = false;
 
             window.firstRendering = true;
+
+            window.renderedScore = 0;
+
+            window.imagesOn = false;
 
             window.setInterval(() => {
                 Plotly.newPlot('time-series', [{
@@ -123,66 +119,78 @@
             }, 5000);
 
             window.showResults = () => {
-                if (!results || !results.score) {
+                if (!results || !results.score || !readyToRender || window.rendering) {
                     return;
                 }
-                if (window.rendering) {
+                if (imagesOn == $('#images-on').is(':checked') && results.score <= renderedScore) {
                     return;
                 }
-                if (window.requested[results.score]) {
-                    return;
-                }
-                window.requested[results.score] = true;
-                function pad (str, max) {
-                    str = str.toString();
-                    return str.length < max ? pad("0" + str, max) : str;
-                }
-                var d = new Date;
-                timeSeries.push({
-                    time: `${d.getFullYear()}-${pad(d.getMonth() + 1, 2)}-${pad(d.getDate(), 2)} ${pad(d.getHours(), 2)}:${pad(d.getMinutes(), 2)}:${pad(d.getSeconds(), 2)}`,
-                    score: results.score * 100
-                });
+                imagesOn = $('#images-on').is(':checked');
+                var score = results.score;
+                var renderingParameters = [results.renumberClusters[0],
+                results.getAdjacencyMatrix[1],
+                results.getRelevantEdges,
+                results.generateLayout];
                 window.rendering = true;
                 $('.tasks li[data-task=render]').addClass('progress');
                 var k = 0;
-                Visualization.createImages(
-                    results.renumberClusters[0],
-                    results.getAdjacencyMatrix[1],
-                    results.getRelevantEdges,
-                    results.generateLayout,
-                    (image) => {
-                        if (!results.getClusterInfo[k]) {
-                            results.getClusterInfo[k] = {
-                                morphemes: []
-                            };
-                        }
-                        if (k == 0 || results.getClusterInfo[k].morphemes.length == 0) {
-                            k++;
-                            return;
-                        }
-                        var hue = parseInt(33 * (k % 10));
-                        var div = $('<div class="cluster">');
-                        if (!window.firstRendering) {
-                            div.addClass('hidden');
-                        }
+                var clusterInfo = results.getClusterInfo;
+                if (clusterInfo.length == 0) {
+                    window.rendering = false;
+                }
+
+                var renderSingleImage = (image) => {
+                    if (!clusterInfo[k]) {
+                        clusterInfo[k] = {
+                            morphemes: []
+                        };
+                    }
+                    if (k == 0 || clusterInfo[k].morphemes.length == 0) {
+                        k++;
+                        return;
+                    }
+                    var hue = parseInt(33 * (k % 10));
+                    var div = $('<div class="cluster">');
+                    if (!window.firstRendering) {
+                        div.addClass('hidden');
+                    }
+                    if ($('#images-on').is(':checked')) {
                         var img = $('<img>').attr('src', image).attr('width', 200).attr('height', 200);
                         var a = $('<a>').attr('href', image).append(img).appendTo(div);
                         new Luminous(a[0]);
-                        var h3 = $('<h3>' + k + ' grupė <span style="color: hsl(' + hue + ', 100%, 50%);">&bull;</span></h3>').appendTo(div);
-                        //$('<p><em>' + (results.getClusterInfo[k].open ? 'Atvira klasė' : 'Uždara klasė') + '</em></p>').appendTo(div);
-                        var p = $('<p>' + (results.getClusterInfo[k].morphemes.join(', ')) + '</p>').appendTo(div);
-                        $('.results-section').append(div);
-                        k++;
-                        if (k == Math.min(results.getClusterInfo.length, Visualization.maxNumClusters)) {
-                            if (!window.firstRendering) {
-                                $('.results-section > .cluster:not(.hidden)').remove();
-                            }
-                            $('.results-section > .cluster.hidden').removeClass('hidden');
-                            window.rendering = false;
-                            window.firstRendering = false;
-                        }
                     }
-                );
+                    var h3 = $('<h3>' + k + ' grupė <span style="color: hsl(' + hue + ', 100%, 50%);">&bull;</span></h3>').appendTo(div);
+                    //$('<p><em>' + (results.getClusterInfo[k].open ? 'Atvira klasė' : 'Uždara klasė') + '</em></p>').appendTo(div);
+                    var p = $('<p>' + (clusterInfo[k].morphemes.join(', ')) + '</p>').appendTo(div);
+                    $('.results-section').append(div);
+                    k++;
+                    if (k == Math.min(clusterInfo.length, Visualization.maxNumClusters)) {
+                        if (!window.firstRendering) {
+                            $('.results-section > .cluster:not(.hidden)').remove();
+                        }
+                        $('.results-section > .cluster.hidden').removeClass('hidden');
+                        window.rendering = false;
+                        window.firstRendering = false;
+                        window.renderedScore = score;
+                    }
+                };
+
+                if ($('#images-on').is(':checked')) {
+                    Visualization.createImages(
+                        renderingParameters[0],
+                        renderingParameters[1],
+                        renderingParameters[2],
+                        renderingParameters[3],
+                        renderSingleImage
+                    );
+                } else {
+                    for (k = 0; k < clusterInfo.length; k++) {
+                        renderSingleImage(null);
+                    }
+                    window.rendering = false;
+                    window.firstRendering = false;
+                    window.renderedScore = score;
+                }
                 $('.tasks li[data-task=render]').removeClass().addClass('completed');
                 $('section:not(.results-section)').hide();
                 $('.results-section').show();
@@ -275,14 +283,30 @@
                         }
                         if (e.data.task == 'getClusterings') {
                             try {
-                                localStorage.setItem([textKey, 'clusterings'].join(':'), JSON.stringify(e.data.result));
+                                //localStorage.setItem([textKey, 'clusterings'].join(':'), JSON.stringify(e.data.result));
                             } catch (error) {
                                 console.log('Local storage quota exceeded.');
                                 //localStorage.clear();
                             }
                         }
                         if (e.data.task == 'ready') {
+                            readyToRender = true;
+                            connectionOpen = false;
                             showResults();
+                        }
+                        if (e.data.task == 'beginPayload') {
+                            connectionOpen = true;
+                        }
+                        if (e.data.task == 'score') {
+                            function pad (str, max) {
+                                str = str.toString();
+                                return str.length < max ? pad("0" + str, max) : str;
+                            }
+                            var d = new Date;
+                            timeSeries.push({
+                                time: `${d.getFullYear()}-${pad(d.getMonth() + 1, 2)}-${pad(d.getDate(), 2)} ${pad(d.getHours(), 2)}:${pad(d.getMinutes(), 2)}:${pad(Math.floor(d.getSeconds()), 2)}`,
+                                score: results.score * 100
+                            });
                         }
                         if (e.data.task == 'segment') {
                             $('.preparing-segments').hide();
@@ -482,12 +506,8 @@
                 <td><input data-key="numClusteringOperations" type="number" value="300"></td>
             </tr> -->
             <tr>
-                <td>Preciziškumo ir atgaminimo santykinė svarba</td>
-                <td><input data-key="precisionMultiplier" type="number" value="1"> : <input data-key="recallMultiplier" type="number" value="1"></td>
-            </tr>
-            <tr>
-                <td>Nuobauda (%) už fonotaktikos pažeidimą</td>
-                <td><input data-key="phonotacticPenalty" type="number" min="0" max="100" value="5"></td>
+                <td>Preciziškumo, atgaminimo ir MDL santykinė svarba</td>
+                <td><input data-key="precisionMultiplier" type="number" value="1"> : <input data-key="recallMultiplier" type="number" value="1"> : <input data-key="MDLMultiplier" type="number" value="1"></td>
             </tr>
             <!-- <tr>
                 <td>Perrinkti grupavimo sprendimų poaibius</td>
@@ -512,6 +532,8 @@
             <li data-task="getMorphemes">Paskelbti kandidatines morfemas</li>
             <li data-task="getAdjacencyMatrix">Sudaryti kaimynystės matricą (<span class="progress">0</span>%)</li>
             <!--<li data-task="doFirstPassClustering">Sugrupuoti morfemas pagal kaimynystės savybes</li>-->
+            <li data-task="generateLayout">Išdėstyti kaimynystės schemą plokštumoje (<span class="progress">0</span>%)</li>
+            <li data-task="getRelevantEdges">Išrinkti rodykles iš kaimynystės matricos (<span class="progress">0</span>%)</li>
             <li data-task="doSecondPassClustering">Sugrupuoti morfemas pagal kaimynystės savybes (<span class="progress">0</span>%)</li>
             <!--<li class="iteration" data-counter="i">
                 <strong>{i} bandymas grupuoti kandidatines morfemas:</strong>
@@ -523,14 +545,13 @@
                 </ul>
             </li>
         -->
-            <li data-task="generateLayout">Išdėstyti kaimynystės schemą plokštumoje (<span class="progress">0</span>%)</li>
-            <li data-task="getRelevantEdges">Išrinkti rodykles iš kaimynystės matricos (<span class="progress">0</span>%)</li>
             <li data-task="render">Nupiešti kaimynystės diagramas (<span class="progress">0</span>%)</li>
         </ul>
     </section>
     <section class="results-section" style="display: none;">
         <h2>Rezultatai</h2>
         <p><a href="" target="_blank">Analizuoti kitą tekstą (naujame skirtuke)</a></p>
+        <p><input id="images-on" type="checkbox"> Rodyti morfotaktinius ryšius grafiškai</p>
         <div id="time-series"></div>
         <!-- <p class="preparing-segments" data-task="segment">Ruošiamas segmentuotas tekstas (<span class="progress">0</span>%)</p>
         <p class="download-segments" style="display: none;"><a href="#" target="_blank">Atsisiųsti segmentuotą tekstą</a></p>
