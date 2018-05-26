@@ -74,6 +74,8 @@ onmessage = (e) => {
         ));
         var info = Morphology.getClusterInfo(null, firstPassClusters, adjacencyMatrix, morphemeMapping, commutations);
         var [info, firstPassClusters, adjacencyMatrix, morphemeMapping] = Morphology.splitMorphemes(info);
+        var numFirstPassClusters = new Set(firstPassClusters).size;
+        Morphology.MDLUpperBound = numFirstPassClusters;
         task('getAdjacencyMatrix', () => [null, morphemeMapping]);
         //console.log(JSON.stringify(firstPassClusters));
         dependencies.adjacencyMatrix = adjacencyMatrix;
@@ -85,7 +87,7 @@ onmessage = (e) => {
         var reclusterings = /*e.data.parameters.clusterings ||*/ [{score: 0, clusters: firstPassClusters, info: info}];
 
         if (reclusterings.length > 0) {
-            console.log(`${reclusterings.length} clustering(s) have been loaded from local cache.`);
+            //console.log(`${reclusterings.length} clustering(s) have been loaded from local cache.`);
         }
 
         var highScore = 0;
@@ -149,7 +151,7 @@ onmessage = (e) => {
                 return Array.from(Object.values(morphemesAsObject));
             });
             task('ready', () => null);
-            task('getClusterings', () => reclusterings);
+            //task('getClusterings', () => reclusterings);
             firstReclustering = false;
         }
     } catch (error) {

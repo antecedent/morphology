@@ -22,6 +22,7 @@ Morphology = {
     recallMultiplier: 1,
     MDLMultiplier: 1,
     numReclusteringIterations: 10,
+    MDLUpperBound: 300,
 
     product: function* (iterable, n) {
         if (n > 0) {
@@ -1182,8 +1183,7 @@ Morphology = {
         var total = final.numEndingPaths;
         var explained = final.explanations.size;
         var descriptionLength = new Set(clusterInfo.map((c) => c.id)).size;
-        // TODO HP
-        return (1 / (Morphology.precisionMultiplier + Morphology.recallMultiplier + Morphology.MDLMultiplier)) * (Morphology.precisionMultiplier * explained / total + Morphology.recallMultiplier * explained / numValidationWords + Morphology.MDLMultiplier * Math.min(1, 10 / descriptionLength));
+        return (1 / (Morphology.precisionMultiplier + Morphology.recallMultiplier + Morphology.MDLMultiplier)) * (Morphology.precisionMultiplier * explained / total + Morphology.recallMultiplier * explained / numValidationWords + Morphology.MDLMultiplier * (1 - Math.min(1, descriptionLength / Morphology.MDLUpperBound)));
     },
 
     getInventedWords: (limit, validationPrefixTree, numValidationWords, clusterInfo, initial, final, words) => {

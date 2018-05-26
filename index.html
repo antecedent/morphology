@@ -146,7 +146,9 @@
                         };
                     }
                     if (k == 0 || clusterInfo[k].morphemes.length == 0) {
-                        k++;
+                        if (image) {
+                            k++;
+                        }
                         return;
                     }
                     var hue = parseInt(33 * (k % 10));
@@ -161,10 +163,14 @@
                     }
                     var h3 = $('<h3>' + k + ' grupė <span style="color: hsl(' + hue + ', 100%, 50%);">&bull;</span></h3>').appendTo(div);
                     //$('<p><em>' + (results.getClusterInfo[k].open ? 'Atvira klasė' : 'Uždara klasė') + '</em></p>').appendTo(div);
-                    var p = $('<p>' + (clusterInfo[k].morphemes.join(', ')) + '</p>').appendTo(div);
+                    var morphemes = clusterInfo[k].morphemes;
+                    morphemes.sort();
+                    var p = $('<p>' + (morphemes.join(', ')) + '</p>').appendTo(div);
                     $('.results-section').append(div);
-                    k++;
-                    if (k == Math.min(clusterInfo.length, Visualization.maxNumClusters)) {
+                    if (image) {
+                        k++;
+                    }
+                    if (k == Math.min(clusterInfo.length, Visualization.maxNumClusters) && image) {
                         if (!window.firstRendering) {
                             $('.results-section > .cluster:not(.hidden)').remove();
                         }
@@ -187,6 +193,10 @@
                     for (k = 0; k < clusterInfo.length; k++) {
                         renderSingleImage(null);
                     }
+                    if (!window.firstRendering) {
+                        $('.results-section > .cluster:not(.hidden)').remove();
+                    }
+                    $('.results-section > .cluster.hidden').removeClass('hidden');
                     window.rendering = false;
                     window.firstRendering = false;
                     window.renderedScore = score;
@@ -507,7 +517,7 @@
             </tr> -->
             <tr>
                 <td>Preciziškumo, atgaminimo ir MDL santykinė svarba</td>
-                <td><input data-key="precisionMultiplier" type="number" value="1"> : <input data-key="recallMultiplier" type="number" value="1"> : <input data-key="MDLMultiplier" type="number" value="1"></td>
+                <td><input data-key="precisionMultiplier" type="number" value="100" style="width: 3em;"> : <input data-key="recallMultiplier" type="number" value="100" style="width: 3em;"> : <input data-key="MDLMultiplier" type="number" value="1" style="width: 3em;"></td>
             </tr>
             <!-- <tr>
                 <td>Perrinkti grupavimo sprendimų poaibius</td>
