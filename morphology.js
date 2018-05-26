@@ -13,7 +13,7 @@ Morphology = {
     maxNumPrimaryCommutations: 3000,
     clusteringIntensity: 100,
     numSecondPassClusteringOuterIterations: 1,
-    minGain: 0.001,
+    minGain: 0.0001,
     commutations: [],
     checkSubsets: false,
     phonotacticPenalty: 50,
@@ -23,6 +23,8 @@ Morphology = {
     MDLMultiplier: 1,
     numReclusteringIterations: 10,
     MDLUpperBound: 300,
+    maxNumRootClusters1: 100,
+    maxNumRootClusters2: 20,
 
     product: function* (iterable, n) {
         if (n > 0) {
@@ -432,7 +434,7 @@ Morphology = {
         var beginningOfText = text.slice(0, 100000);
         for (var morpheme of relevantMorphemes) {
             progressCallback(progress++, relevantMorphemes.length);
-            frequencies[morpheme] = (beginningOfText.match(new RegExp(morpheme, 'g')) || []).length;
+            frequencies[morpheme] = beginningOfText.split(morpheme).length - 1;
         }
         relevantMorphemes.sort((l, r) => frequencies[r] - frequencies[l]);
         relevantMorphemes = relevantMorphemes.slice(0, Morphology.pruningThreshold);
@@ -522,11 +524,11 @@ Morphology = {
 
         var clusterByMorphemeId = [];
         clusterByMorphemeId.fill(null, 0, Object.values(morphemeMapping).reduce((c1, c2) => Math.max(), 0));
-        var morphemeListByCluster = {};
+        var morphemeListByCluster = {0: []};
 
-        var signatureByCluster = [];
+        var signatureByCluster = [null];
 
-        var numClusters = 0;
+        var numClusters = 1;
 
         for (var affix of affixes) {
             signatureByCluster[numClusters] = null;
@@ -551,6 +553,45 @@ Morphology = {
             signatures[key].push(root);
         }
 
+        var M = Array.from(Object.keys(signatures)).map((s) => signatures[s].length);
+        M.sort((l, r) => r - l);
+        M = M.slice(0, Morphology.maxNumRootClusters1);
+
+        for (var key of Object.keys(signatures)) {
+            if (signatures[key].length < M[M.length - 1]) {
+                delete signatures[key];
+            }
+        }
+
+        while (Object.keys(signatures).length > Morphology.maxNumRootClusters2) {
+            // Conflate root clusters
+            var S = Array.from(Object.keys(signatures));
+            var nearest = {distance: Infinity, first: null, second: null};
+            var n = S.length;
+            for (var i = 0; i < n; i++) {
+                for (var j = i + 1; j < n; j++) {
+                    var distance = Morphology.hamming(S[i], S[j]);
+                    if (distance < nearest.distance) {
+                        nearest = {distance: distance, first: i, second: j};
+                    }
+                }
+            }
+            var disjunction = [];
+            for (var i = 0; i < S[0].length; i++) {
+                var a = S[nearest.first][i] == '1';
+                var b = S[nearest.second][i] == '1';
+                disjunction.push((a || b) ? 1 : 0);
+            }
+            disjunction = disjunction.join('');
+            var union = Array.from(new Set(signatures[S[nearest.first]].concat(signatures[S[nearest.second]])));
+            delete signatures[S[nearest.first]];
+            delete signatures[S[nearest.second]];
+            if (!signatures.hasOwnProperty(disjunction)) {
+                signatures[disjunction] = [];
+            }
+            signatures[disjunction] = Array.from(new Set(signatures[disjunction].concat(union)));
+        }
+
         for (var signature of Object.keys(signatures)) {
             morphemeListByCluster[numClusters] = signatures[signature];
             for (var root of signatures[signature]) {
@@ -563,10 +604,12 @@ Morphology = {
         var result = [];
 
         for (var i = 0; i < adjacencyMatrix.length; i++) {
-            result.push(clusterByMorphemeId[i]);
+            result.push(clusterByMorphemeId[i] || 0);
         }
 
         Morphology.firstPassClusterCount = numClusters;
+
+        debugger;
 
         return [result, signatureByCluster];
     },
@@ -641,6 +684,8 @@ Morphology = {
             final
         ];
 
+        var numMorphemes = 0;
+
         var n = 0;
         var split = (root, rootCopy, path) => {
             //console.log(JSON.stringify(path));
@@ -672,6 +717,7 @@ Morphology = {
                     }
                 }
                 rootCopy[path[0].relation].add(result[result.length - 1]);
+                numMorphemes += path.length - 1;
                 return;
             }
             for (var relation of ['successors', 'predecessors']) {
@@ -682,11 +728,23 @@ Morphology = {
                     if (!next.affix || path.map((p) => p.cluster).includes(next)) {
                         continue;
                     }
+                    if (new Set(path.concat({relation: relation}).map((p) => p.relation)).size > 1) {
+                        continue;
+                    }
+                    if (numMorphemes > Morphology.pruningThreshold) {
+                        return;
+                    }
                     split(root, rootCopy, path.concat([{cluster: next, relation: relation}]));
                 }
             }
         };
+        // NOTE: pruning
         var roots = info.filter((i) => !i.affix);
+        var rootScore = (root) => root.morphemes.map((m) => m.length).reduce((a, x) => a + x, 0);
+        roots.sort((l, r) => r.morphemes.length - l.morphemes.length);
+
+        var resultLength = result.length;
+
         for (var root of roots) {
             var rootCopy = {
                 id: id++,
@@ -698,6 +756,7 @@ Morphology = {
                 successors: new Set,
                 predecessors: new Set,
             };
+            numMorphemes += root.morphemes.length;
             if (Array.from(root.predecessors).filter((p) => p.morphemes[0] == '⋊').length > 0) {
                 rootCopy.predecessors.add(initial);
             }
@@ -706,6 +765,10 @@ Morphology = {
             }
             result.push(rootCopy);
             split(root, rootCopy, []);
+            if (numMorphemes > Morphology.pruningThreshold) {
+                result = result.slice(0, resultLength);
+            }
+            resultLength = result.length;
         }
 
         for (var cluster of result) {
@@ -806,7 +869,7 @@ Morphology = {
             }
             for (var [c1, c2] of [[first, second], [second, first]]) {
                 if (info[c1].disabled) {
-                    continue trialLoop;
+                    //continue trialLoop;
                 }
                 if ((info[c1].site || '').includes('left') && (info[c2].site || '').includes('right')) {
                     continue trialLoop;
@@ -1015,9 +1078,9 @@ Morphology = {
         for (var i = 0; i < numClusters; i++) {
             result.push({});
             result[i].id = i;
-            result[i].disabled = false;
+            result[i].disabled = (i == 0);
             result[i].morphemes = [];
-            result[i].affix = false;
+            result[i].affix = (i == 0);
             result[i].site = null;
             for (var j = 0; j < reverseMorphemeMapping.length; j++) {
                 if (clusters[j] == i) {

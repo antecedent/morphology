@@ -163,8 +163,31 @@
                     }
                     var h3 = $('<h3>' + k + ' grupė <span style="color: hsl(' + hue + ', 100%, 50%);">&bull;</span></h3>').appendTo(div);
                     //$('<p><em>' + (results.getClusterInfo[k].open ? 'Atvira klasė' : 'Uždara klasė') + '</em></p>').appendTo(div);
-                    var morphemes = clusterInfo[k].morphemes;
-                    morphemes.sort();
+                    var removeSubscripts = (word) => {
+                        var result = [];
+                        var chars = ['₀', '₁', '₂',	'₃', '₄', '₅', '₆', '₇', '₈', '₉'];
+                        for (var i = 0; i < word.length; i++) {
+                            if (chars.includes(word[i])) {
+                                continue;
+                            }
+                            result.push(word[i]);
+                        }
+                        return result.join('');
+                    };
+                    var morphemes = clusterInfo[k].morphemes.map(removeSubscripts);
+                    var subtypeCount = {};
+                    for (var morpheme of morphemes) {
+                        if (!subtypeCount.hasOwnProperty(morpheme)) {
+                            subtypeCount[morpheme] = 0;
+                        }
+                        subtypeCount[morpheme]++;
+                    }
+                    morphemes = Array.from(Object.keys(subtypeCount)).map((m) => {
+                        if (subtypeCount[m] > 1) {
+                            m += ` (${subtypeCount[m]})`;
+                        }
+                        return m;
+                    });
                     var p = $('<p>' + (morphemes.join(', ')) + '</p>').appendTo(div);
                     $('.results-section').append(div);
                     if (image) {
@@ -517,7 +540,7 @@
             </tr> -->
             <tr>
                 <td>Preciziškumo, atgaminimo ir MDL santykinė svarba</td>
-                <td><input data-key="precisionMultiplier" type="number" value="50" style="width: 3em;"> : <input data-key="recallMultiplier" type="number" value="50" style="width: 3em;"> : <input data-key="MDLMultiplier" type="number" value="1" style="width: 3em;"></td>
+                <td><input data-key="precisionMultiplier" type="number" value="50" style="width: 3em;"> : <input data-key="recallMultiplier" type="number" value="50" style="width: 3em;"> : <input data-key="MDLMultiplier" type="number" value="2" style="width: 3em;"></td>
             </tr>
             <!-- <tr>
                 <td>Perrinkti grupavimo sprendimų poaibius</td>
