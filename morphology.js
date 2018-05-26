@@ -598,17 +598,40 @@ Morphology = {
 
         var info = Morphology.copyClusterInfo(info);
 
-        var initial = info.filter((c) => c.morphemes.includes('⋊'))[0];
-        var final = info.filter((c) => c.morphemes.includes('⋉'))[0];
+        for (var cluster of info) {
+            for (var successor of cluster.successors) {
+                successor.predecessors.add(cluster);
+            }
+        }
 
-        initial.id = 1;
-        final.id = 2;
+        var initial = {
+            id: 1,
+            disabled: false,
+            affix: true,
+            boundary: true,
+            site: null,
+            successors: new Set,
+            predecessors: new Set,
+            morphemes: ['⋊']
+        };
+
+        var final = {
+            id: 2,
+            disabled: false,
+            affix: true,
+            boundary: true,
+            site: null,
+            successors: new Set,
+            predecessors: new Set,
+            morphemes: ['⋉']
+        };
 
         var result = [
             {
                 id: 0,
                 disabled: true,
                 affix: true,
+                site: null,
                 boundary: false,
                 successors: new Set,
                 predecessors: new Set,
@@ -656,17 +679,15 @@ Morphology = {
                     debugger;
                 }
                 for (var next of last[relation]) {
-                    if (path.includes(next)) {
+                    if (!next.affix || path.map((p) => p.cluster).includes(next)) {
                         continue;
                     }
                     split(root, rootCopy, path.concat([{cluster: next, relation: relation}]));
                 }
             }
         };
-        for (var root of info) {
-            if (root.affix) {
-                continue;
-            }
+        var roots = info.filter((i) => !i.affix);
+        for (var root of roots) {
             var rootCopy = {
                 id: id++,
                 disabled: false,
@@ -677,10 +698,10 @@ Morphology = {
                 successors: new Set,
                 predecessors: new Set,
             };
-            if (root.predecessors.has(initial)) {
+            if (Array.from(root.predecessors).filter((p) => p.morphemes[0] == '⋊').length > 0) {
                 rootCopy.predecessors.add(initial);
             }
-            if (root.successors.has(final)) {
+            if (Array.from(root.successors).filter((p) => p.morphemes[0] == '⋉').length > 0) {
                 rootCopy.successors.add(final);
             }
             result.push(rootCopy);
@@ -1183,7 +1204,13 @@ Morphology = {
         var total = final.numEndingPaths;
         var explained = final.explanations.size;
         var descriptionLength = new Set(clusterInfo.map((c) => c.id)).size;
-        return (1 / (Morphology.precisionMultiplier + Morphology.recallMultiplier + Morphology.MDLMultiplier)) * (Morphology.precisionMultiplier * explained / total + Morphology.recallMultiplier * explained / numValidationWords + Morphology.MDLMultiplier * (1 - Math.min(1, descriptionLength / Morphology.MDLUpperBound)));
+        var normalizingFactor = (1 / (Morphology.precisionMultiplier + Morphology.recallMultiplier + Morphology.MDLMultiplier));
+        var scoring = {
+            precision: Morphology.precisionMultiplier * explained / total,
+            recall: Morphology.recallMultiplier * explained / numValidationWords,
+            MDL: Morphology.MDLMultiplier * (1 - Math.min(1, descriptionLength / Morphology.MDLUpperBound))
+        }
+        return normalizingFactor * (scoring.precision + scoring.recall + scoring.MDL);
     },
 
     getInventedWords: (limit, validationPrefixTree, numValidationWords, clusterInfo, initial, final, words) => {

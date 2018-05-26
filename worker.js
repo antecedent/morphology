@@ -45,7 +45,7 @@ onmessage = (e) => {
     try {
         var preliminaryWords = e.data.text.split(/\s+/);
         var trainingSetPivot = Math.floor(preliminaryWords.length / (Morphology.trainingSetProportion + 1) * (Morphology.trainingSetProportion));
-        trainingSetPivot = Math.min(trainingSetPivot, 30000);
+        trainingSetPivot = Math.min(trainingSetPivot, 100000);
         var trainingSet = preliminaryWords.slice(0, trainingSetPivot).join(' ');
         var validationSet = preliminaryWords.slice(trainingSetPivot).join(' ');
         var words = task('extractWords', () => Morphology.extractWords(trainingSet));
