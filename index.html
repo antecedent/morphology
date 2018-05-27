@@ -194,20 +194,21 @@
                 });
                 network.on('afterDrawing', () => {
                     if (!networksDrawn.has(tag)) {
-                        drawingNetworkNow = false;
                         var link = $('.update-network').show().find('a').click(() => {
-                            var newNetwork = $('.network-in-preparation');
-                            var oldNetwork = $('.network');
-                            oldNetwork.removeClass('network').addClass('network-in-preparation');
-                            newNetwork.removeClass('network-in-preparation').addClass('network');
-                            $('.update-network').hide();
+                            if (!networksDrawn.has(tag)) {
+                                var newNetwork = $('.network-in-preparation')[0];
+                                var oldNetwork = $('.network')[0];
+                                $(newNetwork).removeClass('network-in-preparation').addClass('network');
+                                $(oldNetwork).removeClass('network').addClass('network-in-preparation').empty();
+                                $('.update-network').hide();
+                                drawingNetworkNow = false;
+                                networksDrawn.add(tag);
+                            }
                             return false;
                         });
                         if (networksDrawn.size == 0) {
-                            $('.network').empty();
                             link.trigger('click');
                         }
-                        networksDrawn.add(tag);
                     }
                 });
             };
@@ -409,7 +410,7 @@
                         }
                         if (e.data.task == 'getClusterings') {
                             try {
-                                localStorage.setItem([textKey, 'clusterings'].join(':'), JSON.stringify(e.data.result));
+                                localStorage.setItem([textKey, 'clusterings', parameters.precisionMultiplier, parameters.recallMultiplier, parameters.MDLMultiplier].join(':'), JSON.stringify(e.data.result));
                             } catch (error) {
                                 console.log('Local storage quota exceeded.');
                                 //localStorage.clear();
@@ -418,7 +419,7 @@
                         if (e.data.task == 'network') {
                             if (window.networkInterval === null) {
                                 drawNetwork();
-                                window.networkInterval = window.setInterval(drawNetwork, 60000);
+                                window.networkInterval = window.setInterval(drawNetwork, 10000);
                             }
                         }
                         if (e.data.task == 'ready') {
