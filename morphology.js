@@ -830,9 +830,9 @@ Morphology = {
                 return false;
             }
         }
-        if ((info[first].host || info[second].host) && info[first].host !== info[second].host) {
-            return false;
-        }
+        // if ((info[first].host || info[second].host) && info[first].host !== info[second].host) {
+        //     return false;
+        // }
         for (var [c1, c2] of [[first, second], [second, first]]) {
             if ((info[c1].site || '').includes('left') && (info[c2].site || '').includes('right')) {
                 return false;
