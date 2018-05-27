@@ -136,13 +136,11 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/luminous-lightbox/2.0.0/Luminous.min.js"></script>
     <script>
         $(() => {
-            window.readyToRender = false;
-
             window.timeSeries = [];
 
             window.results = {};
 
-            window.connectionOpen = false;
+            window.requested = {};
 
             window.rendering = false;
 
@@ -166,7 +164,6 @@
             //         y: timeSeries.map((t) => t.score)
             //     }]);
             // }, 1000);
-
             window.setInterval(() => {
                 showResults();
             }, 10000);
@@ -226,15 +223,19 @@
                 if (!results || !results.score || !readyToRender || window.rendering || !autoRefresh) {
                     return;
                 }
-                if (imagesOn == $('#images-on').is(':checked') && results.score <= renderedScore) {
+                if (window.requested[results.score]) {
                     return;
                 }
-                imagesOn = $('#images-on').is(':checked');
-                var score = results.score;
-                var renderingParameters = [results.renumberClusters[0],
-                results.getAdjacencyMatrix[1],
-                results.getRelevantEdges,
-                results.generateLayout];
+                window.requested[results.score] = true;
+                function pad (str, max) {
+                    str = str.toString();
+                    return str.length < max ? pad("0" + str, max) : str;
+                }
+                var d = new Date;
+                timeSeries.push({
+                    time: `${d.getFullYear()}-${pad(d.getMonth() + 1, 2)}-${pad(d.getDate(), 2)} ${pad(d.getHours(), 2)}:${pad(d.getMinutes(), 2)}:${pad(d.getSeconds(), 2)}`,
+                    score: results.score * 100
+                });
                 window.rendering = true;
                 $('.tasks li[data-task=render]').addClass('progress');
                 var k = 0;
@@ -256,15 +257,13 @@
                     if (k == 0 || clusterInfo[k].morphemes.length == 0) {
                         if (image) {
                             k++;
+                            return;
                         }
-                        return;
-                    }
-                    var hue = parseInt(33 * (k % 10));
-                    var div = $('<div class="cluster">');
-                    if (!window.firstRendering) {
-                        div.addClass('hidden');
-                    }
-                    if ($('#images-on').is(':checked')) {
+                        var hue = parseInt(33 * (k % 10));
+                        var div = $('<div class="cluster">');
+                        if (!window.firstRendering) {
+                            div.addClass('hidden');
+                        }
                         var img = $('<img>').attr('src', image).attr('width', 200).attr('height', 200);
                         var a = $('<a>').attr('href', image).append(img).appendTo(div);
                         new Luminous(a[0]);
@@ -289,38 +288,16 @@
                     $('.results-section').append(div);
                     if (image) {
                         k++;
-                    }
-                    if (k == Math.min(clusterInfo.length, Visualization.maxNumClusters) && image) {
-                        if (!window.firstRendering) {
-                            $('.results-section > .cluster:not(.hidden)').remove();
+                        if (k == Math.min(results.getClusterInfo.length, Visualization.maxNumClusters)) {
+                            if (!window.firstRendering) {
+                                $('.results-section > .cluster:not(.hidden)').remove();
+                            }
+                            $('.results-section > .cluster.hidden').removeClass('hidden');
+                            window.rendering = false;
+                            window.firstRendering = false;
                         }
-                        $('.results-section > .cluster.hidden').removeClass('hidden');
-                        window.rendering = false;
-                        window.firstRendering = false;
-                        window.renderedScore = score;
                     }
-                };
-
-                if ($('#images-on').is(':checked')) {
-                    Visualization.createImages(
-                        renderingParameters[0],
-                        renderingParameters[1],
-                        renderingParameters[2],
-                        renderingParameters[3],
-                        renderSingleImage
-                    );
-                } else {
-                    for (k = 0; k < clusterInfo.length; k++) {
-                        renderSingleImage(null);
-                    }
-                    if (!window.firstRendering) {
-                        $('.results-section > .cluster:not(.hidden)').remove();
-                    }
-                    $('.results-section > .cluster.hidden').removeClass('hidden');
-                    window.rendering = false;
-                    window.firstRendering = false;
-                    window.renderedScore = score;
-                }
+                );
                 $('.tasks li[data-task=render]').removeClass().addClass('completed');
                 $('section:not(.results-section)').hide();
                 $('.results-section').show();
@@ -426,20 +403,6 @@
                             connectionOpen = false;
                             $('header').hide();
                             showResults();
-                        }
-                        if (e.data.task == 'beginPayload') {
-                            connectionOpen = true;
-                        }
-                        if (e.data.task == 'score') {
-                            function pad (str, max) {
-                                str = str.toString();
-                                return str.length < max ? pad("0" + str, max) : str;
-                            }
-                            var d = new Date;
-                            timeSeries.push({
-                                time: `${d.getFullYear()}-${pad(d.getMonth() + 1, 2)}-${pad(d.getDate(), 2)} ${pad(d.getHours(), 2)}:${pad(d.getMinutes(), 2)}:${pad(Math.floor(d.getSeconds()), 2)}`,
-                                score: results.score * 100
-                            });
                         }
                         if (e.data.task == 'segment') {
                             $('.preparing-segments').hide();
@@ -641,8 +604,12 @@
                 <td><input data-key="numClusteringOperations" type="number" value="300"></td>
             </tr> -->
             <tr>
-                <td>Preciziškumo, atgaminimo ir MDL santykinė svarba</td>
-                <td><input data-key="precisionMultiplier" type="number" value="50" style="width: 3em;"> : <input data-key="recallMultiplier" type="number" value="50" style="width: 3em;"> : <input data-key="MDLMultiplier" type="number" value="2" style="width: 3em;"></td>
+                <td>Preciziškumo ir atgaminimo santykinė svarba</td>
+                <td><input data-key="precisionMultiplier" type="number" value="1"> : <input data-key="recallMultiplier" type="number" value="1"></td>
+            </tr>
+            <tr>
+                <td>Nuobauda (%) už fonotaktikos pažeidimą</td>
+                <td><input data-key="phonotacticPenalty" type="number" min="0" max="100" value="5"></td>
             </tr>
             <!-- <tr>
                 <td>Perrinkti grupavimo sprendimų poaibius</td>
