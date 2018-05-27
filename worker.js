@@ -95,7 +95,6 @@ onmessage = (e) => {
 
         task('restoreStateFromCache', () => {
             var i = 0;
-            debugger;
             if (e.data.parameters.clusterings) {
                 try {
                     for (var clustering of e.data.parameters.clusterings) {
