@@ -52,7 +52,6 @@
         .morphotactics {
             background: #555;
             color: white;
-            max-height: 100px;
         }
 
         .cluster:hover {
@@ -77,19 +76,57 @@
             display: none;
         }
 
+        .network, .network-in-preparation {
+            width: 100vw;
+            height: 100vh;
+            position: fixed;
+            left: 0;
+            top: 0;
+            background: white;
+        }
+
+        .network {
+            z-index: 1;
+        }
+
+        .network-in-preparation {
+            z-index: 0;
+        }
+
+        header {
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+        }
+
+        .network .wait {
+            margin-top: 45vh !important;
+            font-size: 5vh;
+            text-align: center;
+        }
+
+        section, header {
+            margin: 20px;
+        }
+
+        section.results-section {
+            margin: 0;
+            padding: 0;
+        }
+
+        .status {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            z-index: 2;
+        }
+
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/luminous-lightbox/2.0.0/luminous-basic.min.css">
-
-    <!-- Global site tag (gtag.js) - Google Analytics -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-20483190-2"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-
-      gtag('config', 'UA-20483190-2');
-    </script>
-
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
     <script
       src="https://code.jquery.com/jquery-3.3.1.min.js"
       integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
@@ -109,24 +146,81 @@
 
             window.firstRendering = true;
 
-            window.setInterval(() => {
-                Plotly.newPlot('time-series', [{
-                    type: 'scatter',
-                    mode: 'lines',
-                    x: timeSeries.map((t) => t.time),
-                    y: timeSeries.map((t) => t.score)
-                }]);
-            }, 1000);
+            window.renderedScore = 0;
 
+            window.imagesOn = false;
+
+            window.autoRefresh = true;
+
+            window.worker = null;
+
+            window.networkInterval = null;
+
+            // window.setInterval(() => {
+            //     Plotly.newPlot('time-series', [{
+            //         type: 'scatter',
+            //         mode: 'lines',
+            //         x: timeSeries.map((t) => t.time),
+            //         y: timeSeries.map((t) => t.score)
+            //     }]);
+            // }, 1000);
             window.setInterval(() => {
                 showResults();
-            }, 5000);
+            }, 10000);
 
-            window.showResults = () => {
-                if (!results || !results.score) {
+            window.networksDrawn = new Set;
+            window.drawingNetworkNow = false;
+
+            window.drawNetwork = () => {
+                if (!results.network || drawingNetworkNow) {
                     return;
                 }
-                if (window.rendering) {
+                drawingNetworkNow = true;
+                var tag = Date.now();
+                results.network.nodes = new vis.DataSet(results.network.nodes);
+                results.network.edges = new vis.DataSet(results.network.edges);
+                var network = new vis.Network($('.network-in-preparation')[0], results.network, {
+                    edges: {
+                        arrows: 'to'
+                    },
+                    nodes: {
+                        widthConstraint: {
+                            maximum: 200
+                        }
+                    }
+                });
+                network.on('afterDrawing', () => {
+                    if (!networksDrawn.has(tag)) {
+                        drawingNetworkNow = false;
+                        var link = $('.update-network').show().find('a').click(() => {
+                            var newNetwork = $('.network-in-preparation');
+                            var oldNetwork = $('.network');
+                            oldNetwork.removeClass('network').addClass('network-in-preparation');
+                            newNetwork.removeClass('network-in-preparation').addClass('network');
+                            $('.update-network').hide();
+                            return false;
+                        });
+                        if (networksDrawn.size == 0) {
+                            $('.network').empty();
+                            link.trigger('click');
+                        }
+                        networksDrawn.add(tag);
+                    }
+                });
+            };
+
+            $('#auto-refresh').change(function () {
+                autoRefresh = $(this).is(':checked');
+            });
+
+            $('#images-on').change(function() {
+                if (worker) {
+                    worker.postMessage({sendImages: $(this).is(':checked')});
+                }
+            });
+
+            window.showResults = () => {
+                if (!results || !results.score || !readyToRender || window.rendering || !autoRefresh) {
                     return;
                 }
                 if (window.requested[results.score]) {
@@ -145,18 +239,23 @@
                 window.rendering = true;
                 $('.tasks li[data-task=render]').addClass('progress');
                 var k = 0;
-                Visualization.createImages(
-                    results.renumberClusters[0],
-                    results.getAdjacencyMatrix[1],
-                    results.getRelevantEdges,
-                    results.generateLayout,
-                    (image) => {
-                        if (!results.getClusterInfo[k]) {
-                            results.getClusterInfo[k] = {
-                                morphemes: []
-                            };
-                        }
-                        if (k == 0 || results.getClusterInfo[k].morphemes.length == 0) {
+                var clusterInfo = results.getClusterInfo;
+                if (clusterInfo.length == 0) {
+                    window.rendering = false;
+                }
+
+                var renderSingleImage = (image) => {
+
+                    // NOTE
+                    return;
+
+                    if (!clusterInfo[k]) {
+                        clusterInfo[k] = {
+                            morphemes: []
+                        };
+                    }
+                    if (k == 0 || clusterInfo[k].morphemes.length == 0) {
+                        if (image) {
                             k++;
                             return;
                         }
@@ -168,10 +267,26 @@
                         var img = $('<img>').attr('src', image).attr('width', 200).attr('height', 200);
                         var a = $('<a>').attr('href', image).append(img).appendTo(div);
                         new Luminous(a[0]);
-                        var h3 = $('<h3>' + k + ' grupė <span style="color: hsl(' + hue + ', 100%, 50%);">&bull;</span></h3>').appendTo(div);
-                        //$('<p><em>' + (results.getClusterInfo[k].open ? 'Atvira klasė' : 'Uždara klasė') + '</em></p>').appendTo(div);
-                        var p = $('<p>' + (results.getClusterInfo[k].morphemes.join(', ')) + '</p>').appendTo(div);
-                        $('.results-section').append(div);
+                    }
+                    var h3 = $('<h3>' + k + ' grupė <span style="color: hsl(' + hue + ', 100%, 50%);">&bull;</span></h3>').appendTo(div);
+                    //$('<p><em>' + (results.getClusterInfo[k].open ? 'Atvira klasė' : 'Uždara klasė') + '</em></p>').appendTo(div);
+                    var morphemes = clusterInfo[k].morphemes.map(Visualization.removeSubscripts);
+                    var subtypeCount = {};
+                    for (var morpheme of morphemes) {
+                        if (!subtypeCount.hasOwnProperty(morpheme)) {
+                            subtypeCount[morpheme] = 0;
+                        }
+                        subtypeCount[morpheme]++;
+                    }
+                    morphemes = Array.from(Object.keys(subtypeCount)).map((m) => {
+                        if (subtypeCount[m] > 1) {
+                            m += ` (${subtypeCount[m]})`;
+                        }
+                        return m;
+                    });
+                    var p = $('<p>' + (morphemes.join(', ')) + '</p>').appendTo(div);
+                    $('.results-section').append(div);
+                    if (image) {
                         k++;
                         if (k == Math.min(results.getClusterInfo.length, Visualization.maxNumClusters)) {
                             if (!window.firstRendering) {
@@ -186,16 +301,14 @@
                 $('.tasks li[data-task=render]').removeClass().addClass('completed');
                 $('section:not(.results-section)').hide();
                 $('.results-section').show();
-                var successRate = 0;
                 var validation = results.getValidationSet;
                 if (validation instanceof Array) {
                     validation = new Set(validation);
                 } else if (!(validation instanceof Set)) {
                     validation = new Set;
                 }
-                var neologisms = results.inventWords.filter((w) => !w.startsWith('<timeout:')).map((w) => {
+                var neologisms = results.inventWords.map((w) => {
                     if (validation.has(w)) {
-                        successRate++;
                         return '<span class="success">' + w + '</span>';
                     }
                     return w;
@@ -221,14 +334,12 @@
                 parameters.numSalientSubstrings,
                 parameters.preferredMorphemeLength,
                 parameters.minCommutationStrength,
-                parameters.maxNumPrimaryCommutations,
-                parameters.trainingSetProportion
+                parameters.trainingSetProportion1,
+                parameters.trainingSetProportion2
             ].join(':');
 
             var run = (text) => {
-                window.parameters = {
-                    trainingSetProportion: 1
-                };
+                window.parameters = {};
                 $('.parameters-section input').each(function () {
                     parameters[$(this).data('key')] = parseFloat($(this).val());
                     if ($(this).is('[type=checkbox]')) {
@@ -242,7 +353,7 @@
                 if (localStorage.getItem(textKey)) {
                     parameters.commutations = JSON.parse(localStorage.getItem(textKey));
                 }
-                var clusteringsKey = [textKey, 'clusterings'].join(':');
+                var clusteringsKey = [textKey, 'clusterings', parameters.precisionMultiplier, parameters.recallMultiplier, parameters.MDLMultiplier].join(':');
                 if (localStorage.getItem(clusteringsKey)) {
                     parameters.clusterings = JSON.parse(localStorage.getItem(clusteringsKey));
                 }
@@ -252,7 +363,7 @@
                 // }
                 // iterator.detach();
                 $('.texts-section, .parameters-section').hide();
-                var worker = new Worker('worker.js');
+                worker = new Worker('worker.js');
                 $('.tasks li').removeClass();
                 $('.progress').text('0');
                 worker.onmessage = (e) => {
@@ -281,7 +392,16 @@
                                 //localStorage.clear();
                             }
                         }
+                        if (e.data.task == 'network') {
+                            if (window.networkInterval === null) {
+                                drawNetwork();
+                                window.networkInterval = window.setInterval(drawNetwork, 60000);
+                            }
+                        }
                         if (e.data.task == 'ready') {
+                            readyToRender = true;
+                            connectionOpen = false;
+                            $('header').hide();
                             showResults();
                         }
                         if (e.data.task == 'segment') {
@@ -360,8 +480,10 @@
     </script>
 </head>
 <body>
-    <h1>Savarankiška (<em>unsupervised</em>) <abbr title="šaknų, priesagų, priešdėlių, galūnių">morfemų</abbr> paieška tekste</h1>
-    <p>&copy; 2018 Ignas Rudaitis</p>
+    <header>
+        <h1>Savarankiška (<em>unsupervised</em>) <abbr title="šaknų, priesagų, priešdėlių, galūnių">morfemų</abbr> paieška tekste</h1>
+        <p>&copy; 2018 Ignas Rudaitis</p>
+    </header>
     <section class="texts-section">
         <h2>Pasirinkite tekstą</h2>
         <p>Numatytieji tekstai imami iš <a href="https://www.gutenberg.org/"><em>Project Gutenberg</em></a> ir <a href="http://www.antologija.lt/"><em>Antologija.lt</em></a>.</p>
@@ -473,10 +595,10 @@
                 <td>Maksimalus aktualių morfemų skaičius</td>
                 <td><input data-key="pruningThreshold" type="number" value="2000"></td>
             </tr>
-            <!-- <tr>
-                <td>Apmokymui skirta teksto proporcija (N : 1)</td>
-                <td><input data-key="trainingSetProportion" value="1"></td>
-            </tr> -->
+            <tr>
+                <td>Apmokymui ir validavimui skirto teksto proporcija</td>
+                <td><input data-key="trainingSetProportion1" value="1" type="number" style="width: 4em;"> : <input data-key="trainingSetProportion2" value="1" type="number" style="width: 4em;"></td>
+            </tr>
             <!-- <tr>
                 <td>Grupavimo operacijų skaičius</td>
                 <td><input data-key="numClusteringOperations" type="number" value="300"></td>
@@ -511,7 +633,10 @@
             <li data-task="getBigrams">Sužymėti galimų morfemų kaimynystę</li>
             <li data-task="getMorphemes">Paskelbti kandidatines morfemas</li>
             <li data-task="getAdjacencyMatrix">Sudaryti kaimynystės matricą (<span class="progress">0</span>%)</li>
+            <li data-task="restoreStateFromCache">Atkurti ankstesnės analizės rezultatus (<span class="progress">0</span>%)</li>
             <!--<li data-task="doFirstPassClustering">Sugrupuoti morfemas pagal kaimynystės savybes</li>-->
+            <!-- <li data-task="generateLayout">Išdėstyti kaimynystės schemą plokštumoje (<span class="progress">0</span>%)</li>
+            <li data-task="getRelevantEdges">Išrinkti rodykles iš kaimynystės matricos (<span class="progress">0</span>%)</li> -->
             <li data-task="doSecondPassClustering">Sugrupuoti morfemas pagal kaimynystės savybes (<span class="progress">0</span>%)</li>
             <!--<li class="iteration" data-counter="i">
                 <strong>{i} bandymas grupuoti kandidatines morfemas:</strong>
@@ -523,26 +648,28 @@
                 </ul>
             </li>
         -->
-            <li data-task="generateLayout">Išdėstyti kaimynystės schemą plokštumoje (<span class="progress">0</span>%)</li>
-            <li data-task="getRelevantEdges">Išrinkti rodykles iš kaimynystės matricos (<span class="progress">0</span>%)</li>
-            <li data-task="render">Nupiešti kaimynystės diagramas (<span class="progress">0</span>%)</li>
+            <!-- <li data-task="render">Nupiešti kaimynystės diagramas (<span class="progress">0</span>%)</li> -->
         </ul>
     </section>
     <section class="results-section" style="display: none;">
-        <h2>Rezultatai</h2>
+        <!-- <h2>Rezultatai</h2>
         <p><a href="" target="_blank">Analizuoti kitą tekstą (naujame skirtuke)</a></p>
-        <div id="time-series"></div>
+        <p><input id="auto-refresh" checked type="checkbox"> Atnaujinti informaciją automatiškai</p>
+        <p><input id="images-on" type="checkbox"> Rodyti morfotaktinius ryšius grafiškai</p> -->
         <!-- <p class="preparing-segments" data-task="segment">Ruošiamas segmentuotas tekstas (<span class="progress">0</span>%)</p>
         <p class="download-segments" style="display: none;"><a href="#" target="_blank">Atsisiųsti segmentuotą tekstą</a></p>
         <p><a href="#" class="download-results" target="_blank">Išsaugoti analizės rezultatus vėlesnei peržiūrai</a></p> -->
-        <div class="divergence-notice" style="display: none;">
+        <!-- <div class="divergence-notice" style="display: none;">
             Naujadarų generavimas nedavė rezultatų. Gali reikėti pasirinkti ilgesnį tekstą arba tiesiog paleisti algoritmą dar kartą.
+        </div> -->
+        <div class="network">
+            <p class="wait">Prašome palaukti, ruošiamas morfotaktinio tinklo vaizdas...</p>
         </div>
-        <div class="morphotactics">
-            <!--<a href="#"><img src="#"></a>-->
-            <h3>Modelio įvertis: <span class="success-rate">0</span>%</h3>
-            <p><strong>Modelio prognozuojami naujadarai:</strong> <span class="neologisms"></span></p>
+        <div class="status">
+            <span class="success-rate">0</span>% tikslumas
+            <span class="update-network" style="display: none;"> &bull; <a href="#">Atnaujinti vaizdą</a></span>
         </div>
+        <div class="network-in-preparation"></div>
     </section>
 </body>
 </html>

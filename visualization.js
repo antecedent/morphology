@@ -5,6 +5,18 @@ $(() => {
         height: 600,
         maxNumClusters: 100,
 
+        removeSubscripts: (word) => {
+            var result = [];
+            var chars = ['₀', '₁', '₂',	'₃', '₄', '₅', '₆', '₇', '₈', '₉'];
+            for (var i = 0; i < word.length; i++) {
+                if (chars.includes(word[i])) {
+                    continue;
+                }
+                result.push(word[i]);
+            }
+            return result.join('');
+        },
+
         createImages: (clusters, morphemeMapping, edges, layout, callback) => {
             var numClusters = 0;
             var result = [];
@@ -94,7 +106,7 @@ $(() => {
                 ctx.fillStyle = 'rgba(0, 0, 0, ?)'.replace('?', nodes.has(i) ? 0.75 : 0.25);
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillText(m, layout[i].x, layout[i].y);
+                ctx.fillText(Visualization.removeSubscripts(m), layout[i].x, layout[i].y);
             }
         },
 
