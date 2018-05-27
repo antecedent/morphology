@@ -38,12 +38,19 @@ var task = (name, callback) => {
     }
 };
 
+var sendImages = false;
+
 onmessage = (e) => {
+    if (e.data.sendImages) {
+        sendImages = e.data.sendImages;
+        return;
+    }
     for (var key of Object.keys(e.data.parameters)) {
         Morphology[key] = e.data.parameters[key];
     }
     try {
         var preliminaryWords = e.data.text.split(/\s+/);
+        Morphology.trainingSetProportion = Morphology.trainingSetProportion1 / Morphology.trainingSetProportion2;
         var trainingSetPivot = Math.floor(preliminaryWords.length / (Morphology.trainingSetProportion + 1) * (Morphology.trainingSetProportion));
         trainingSetPivot = Math.min(trainingSetPivot, 30000);
         var trainingSet = preliminaryWords.slice(0, trainingSetPivot).join(' ');
@@ -65,24 +72,50 @@ onmessage = (e) => {
         commutations = task('refineCommutations', () => Morphology.refineCommutations(commutations, prefixTree, wordArray, progress('refineCommutations')));
         var bigrams = task('getBigrams', () => Morphology.getBigrams(commutations));
         var morphemes = task('getMorphemes', () => Morphology.getMorphemes(bigrams));
-        var [adjacencyMatrix, morphemeMapping, relevantMorphemes] = task('getAdjacencyMatrix', () => Morphology.getAdjacencyMatrix(bigrams, morphemes, commutations, trainingSet.toLowerCase(), progress('getAdjacencyMatrix')));
+        var [adjacencyMatrix, morphemeMapping, relevantMorphemes, adjacencyList] =  Morphology.getAdjacencyMatrix(bigrams, morphemes, commutations, trainingSet.toLowerCase(), progress('getAdjacencyMatrix'));
         var [firstPassClusters, signatures] = task('doFirstPassClustering', () => Morphology.doFirstPassClustering(
             adjacencyMatrix,
             relevantMorphemes,
             commutations,
             morphemeMapping
         ));
-        dependencies.adjacencyMatrix = adjacencyMatrix;
-        dependencies.commutations = commutations;
+        var info = Morphology.getClusterInfo(null, firstPassClusters, adjacencyList, morphemeMapping, commutations);
+        var [info, firstPassClusters, adjacencyList, morphemeMapping] = Morphology.splitMorphemes(info);
+        var numFirstPassClusters = new Set(firstPassClusters).size;
+        Morphology.MDLUpperBound = Math.min(numFirstPassClusters, Morphology.maxNumClusters);
+        task('getAdjacencyMatrix', () => [null, morphemeMapping]);
+        //console.log(JSON.stringify(firstPassClusters));
+        dependencies.adjacencyList = adjacencyList;
         dependencies.morphemeMapping = morphemeMapping;
         dependencies.validationPrefixTree = validationPrefixTree;
         dependencies.numValidationWords = validationWords.size;
         dependencies.trainingWords = words;
 
-        var reclusterings = e.data.parameters.clusterings || [];
+        var initialClustering = {score: 0, clusters: firstPassClusters, info: info, history: []};
 
-        if (reclusterings.length > 0) {
-            console.log(`${reclusterings.length} clustering(s) have been loaded from local cache.`);
+        var reclusterings = [initialClustering];
+
+        task('restoreStateFromCache', () => {
+            var i = 0;
+            if (e.data.parameters.clusterings) {
+                try {
+                    for (var clustering of e.data.parameters.clusterings) {
+                        progress('restoreStateFromCache')(i++, e.data.parameters.clusterings.length);
+                        try {
+                            reclusterings.push(Morphology.reenactReclusteringHistory(clustering.history, firstPassClusters, info, dependencies));
+                        } catch (error) {
+                            reclusterings = [initialClustering];
+                            debugger;
+                        }
+                    }
+                } catch (error) {
+                    debugger;
+                }
+            }
+        });
+
+        if (reclusterings.length > 1) {
+            console.log(`${reclusterings.length - 1} clustering(s) have been loaded from local cache.`);
         }
 
         var highScore = 0;
@@ -100,10 +133,23 @@ onmessage = (e) => {
         var firstReclustering = true;
 
         while (true) {
-            if (Math.random() < 0.1 || reclusterings.length == 0) {
-                var clusters = firstPassClusters;
-            } else {
-                var clusters = reclusterings[Math.floor(reclusterings.length * Math.random())].clusters;
+            if (reclusterings.length > numReclusteringsToKeep) {
+                var reclusteringsBackup = Morphology.shuffle(reclusterings)[0];
+                reclusterings = [initialClustering];
+                var max = reclusteringsBackup.reduce((a, x) => Math.max(x.score, a), 0);
+                var min = reclusteringsBackup.reduce((a, x) => Math.min(x.score, a), Infinity);
+                var bucketSize = (max - min) / numBuckets;
+                for (var bucket = min; bucket < max; bucket += bucketSize) {
+                    var i = 0;
+                    for (var r of reclusteringsBackup) {
+                        if (r.score >= bucket && r.score <= bucket + bucketSize) {
+                            reclusterings.push(r);
+                            if (i++ > numReclusteringsToKeep / numBuckets) {
+                                break;
+                            }
+                        }
+                    }
+                }
             }
             var reclustering = task('doSecondPassClustering', () => Morphology.recluster(clusters, dependencies, firstReclustering ? progress('doSecondPassClustering') : null));
             reclusterings.push(reclustering);
@@ -111,6 +157,12 @@ onmessage = (e) => {
             if (reclusterings.length > numReclusteringsToKeep) {
                 reclusterings.pop();
             }
+            var pick = Math.floor(span * Math.random());
+            var clusters = Array.from(reclusterings[pick].clusters);
+            info = Morphology.copyClusterInfo(reclusterings[pick].info);
+            var reclustering = task('doSecondPassClustering', () => Morphology.recluster(info, Array.from(clusters), reclusterings[pick].history, dependencies, firstReclustering ? progress('doSecondPassClustering') : null));
+            //info = Morphology.copyClusterInfo(reclustering.info);
+            reclusterings.push(reclustering);
             console.log((100 * reclustering.score).toFixed(2) + '%');
             if (reclustering.score - highScore < Morphology.minGain) {
                 continue;
@@ -119,23 +171,24 @@ onmessage = (e) => {
             task('doSecondPassClustering', () => reclustering.clusters);
             task('score', () => reclustering.score);
             task('inventWords', () => reclustering.inventedWords);
-            var info =
-                Morphology.getClusterInfo(
-                    null,
-                    reclustering.clusters,
-                    dependencies.adjacencyMatrix,
-                    dependencies.morphemeMapping,
-                    dependencies.commutations
-                );
-            task('renumberClusters', () => [reclustering.clusters, null]);
-            var layout = task('generateLayout', () => Morphology.generateLayout(Object.keys(morphemeMapping).length, reclustering.clusters, null, info, e.data.canvasWidth, e.data.canvasHeight, e.data.vertexRadius, progress('generateLayout')));
-            var edges = task('getRelevantEdges', () => Morphology.getRelevantEdges(adjacencyMatrix, morphemeMapping, reclustering.clusters, info, progress('getRelevantEdges')));
-            task('getClusterInfo', () => info);
+            var translation = {};
+            var [clustersToSend, numClustersToSend] = task('renumberClusters', () => Morphology.renumberClusters(reclustering.clusters, null, morphemeMapping, translation));
+            task('doSecondPassClustering', () => clustersToSend);
+            var morphemesAsObject = {};
+            for (var source of Object.keys(translation)) {
+                morphemesAsObject[translation[source]] = {morphemes: reclustering.info[source].morphemes};
+            }
+            var renumberedInfo = Array.from(Object.values(morphemesAsObject));
+            task('getClusterInfo', () => renumberedInfo.map((i) => ({morphemes: i.morphemes})));
+            var layout = task('generateLayout', () => Morphology.generateLayout(Object.keys(morphemeMapping).length, clustersToSend, null, renumberedInfo, e.data.canvasWidth, e.data.canvasHeight, e.data.vertexRadius, (p, t) => null));
+            var edges = task('getRelevantEdges', () => Morphology.getRelevantEdges(adjacencyList, morphemeMapping, clustersToSend, renumberedInfo, (p, t) => null));
+            task('getClusterings', () => reclusterings.map((r) => ({history: r.history})));
+            task('network', () => Morphology.network(info));
             task('ready', () => null);
-            task('getClusterings', () => reclusterings);
             firstReclustering = false;
         }
     } catch (error) {
+        debugger;
         throw error;
         // Already handled by task()
     }
