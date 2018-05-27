@@ -175,11 +175,13 @@ onmessage = (e) => {
             task('getClusterInfo', () => renumberedInfo.map((i) => ({morphemes: i.morphemes})));
             var layout = task('generateLayout', () => Morphology.generateLayout(Object.keys(morphemeMapping).length, clustersToSend, null, renumberedInfo, e.data.canvasWidth, e.data.canvasHeight, e.data.vertexRadius, (p, t) => null));
             var edges = task('getRelevantEdges', () => Morphology.getRelevantEdges(adjacencyList, morphemeMapping, clustersToSend, renumberedInfo, (p, t) => null));
-            task('ready', () => null);
             task('getClusterings', () => reclusterings.map((r) => ({history: r.history})));
+            task('network', () => Morphology.network(info));
+            task('ready', () => null);
             firstReclustering = false;
         }
     } catch (error) {
+        debugger;
         throw error;
         // Already handled by task()
     }
