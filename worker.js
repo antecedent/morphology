@@ -155,7 +155,6 @@ onmessage = (e) => {
             var reclustering = task('doSecondPassClustering', () => Morphology.recluster(info, Array.from(clusters), reclusterings[pick].history, dependencies, firstReclustering ? progress('doSecondPassClustering') : null));
             //info = Morphology.copyClusterInfo(reclustering.info);
             reclusterings.push(reclustering);
-            console.log((100 * reclustering.score).toFixed(2) + '%');
             if (reclustering.score - highScore < Morphology.minGain) {
                 continue;
             }
