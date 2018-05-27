@@ -1,5 +1,4 @@
 importScripts('morphology.js');
-importScripts('https://www.lactame.com/lib/ml/3.2.0/ml.min.js');
 
 var dependencies = {};
 
@@ -90,6 +89,7 @@ onmessage = (e) => {
         dependencies.validationPrefixTree = validationPrefixTree;
         dependencies.numValidationWords = validationWords.size;
         dependencies.trainingWords = words;
+        dependencies.commutations = commutations;
 
         var initialClustering = {score: 0, clusters: firstPassClusters, info: info, history: []};
 
