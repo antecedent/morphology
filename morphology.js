@@ -68,7 +68,6 @@ Morphology = {
             }
             // Filter out quotations in foreign alphabets
             var unigrams = Object.keys(unigrams).filter((u) => unigrams[u] > cutoff);
-            console.log(`# of relevant unigrams: ${unigrams.length}`);
             for (var nGram of Morphology.product(unigrams, n)) {
                 nGram = nGram.join('');
                 var test = nGram;
@@ -670,8 +669,8 @@ Morphology = {
                         site: step.cluster.site,
                         host: (i == 0) ? rootCopy : null,
                         morphemes: [step.cluster.morphemes[0] + Morphology.numberToUnicodeSubscript(n)],
-                        successors: new Set((i != path.length - 1 && path[i + 1].relation == 'successor') ? [result[result.length - 1]] : []),
-                        predecessors: new Set((i != path.length - 1 && path[i + 1].relation == 'predecessor') ? [result[result.length - 1]] : []),
+                        successors: new Set((i != path.length - 2 && path[i + 1].relation == 'successors') ? [result[result.length - 1]] : []),
+                        predecessors: new Set((i != path.length - 2 && path[i + 1].relation == 'predecessors') ? [result[result.length - 1]] : []),
                     });
                     if (i == path.length - 2) {
                         if (path[path.length - 1].cluster.morphemes.includes('⋊')) {
@@ -823,6 +822,9 @@ Morphology = {
         if (first == second) {
             return false;
         }
+        if (info[first].boundary || info[second].boundary) {
+            return false;
+        }
         if (info[first].affix != info[second].affix) {
             if (!info[first].disabled && !info[second].disabled) {
                 return false;
@@ -871,8 +873,11 @@ Morphology = {
 
         var expandCascade = (first, second) => {
             for (var relation of ['successors', 'predecessors']) {
-                for (var c1 of info[first][relation]) {
-                    for (var c2 of info[second][relation]) {
+                for (var c1 of infoBackup[first][relation]) {
+                    for (var c2 of infoBackup[second][relation]) {
+                        if (c1.boundary || c2.boundary) {
+                            continue;
+                        }
                         if (equivalent(c1, c2)) {
                             affixCascade.push([c1.id, c2.id]);
                         }
@@ -884,7 +889,7 @@ Morphology = {
         var equivalent = (c1, c2) => {
             for (var m1 of c1.morphemes) {
                 for (var m2 of c2.morphemes) {
-                    if (Morphology.removeSubscripts(m1) == Morphology.removeSubscripts(m2)) {
+                    if (m1 != m2 && Morphology.removeSubscripts(m1) == Morphology.removeSubscripts(m2)) {
                         return true;
                     }
                 }
@@ -933,11 +938,17 @@ Morphology = {
                 if (affixCascade.length > 0) {
                     affixCascade.shift();
                 }
+                if (!infoBackup[first].affix && !infoBackup[second].affix) {
+                    expandCascade(first, second);
+                } else {
+                    for (var [a, b] of [[first, second], [second, first]]) {
+                        if (infoBackup[a].disabled && !infoBackup[b].disabled && !infoBackup[b].affix) {
+                            break;
+                        }
+                    }
+                }
             } else {
                 info = infoBackup;
-            }
-            if (!info[first].affix || (info[first].disabled && !info[second].affix)) {
-                expandCascade(first, second);
             }
         }
         return {
@@ -1137,12 +1148,17 @@ Morphology = {
             };
         }
         for (var cluster of clusters) {
+            var neighborIds = new Set;
             for (var relation of ['successors', 'predecessors']) {
                 if (!clusters[cluster.id].hasOwnProperty(relation)) {
                     continue;
                 }
                 for (var neighbor of clusters[cluster.id][relation]) {
+                    if (neighborIds.has(neighbor.id)) {
+                        continue;
+                    }
                     instances[cluster.id][relation].add(instances[neighbor.id]);
+                    neighborIds.add(neighbor.id);
                 }
             }
         }
