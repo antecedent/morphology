@@ -52,6 +52,7 @@ onmessage = (e) => {
         var preliminaryWords = e.data.text.split(/\s+/);
         Morphology.trainingSetProportion = Morphology.trainingSetProportion1 / Morphology.trainingSetProportion2;
         var trainingSetPivot = Math.floor(preliminaryWords.length / (Morphology.trainingSetProportion + 1) * (Morphology.trainingSetProportion));
+        trainingSetPivot = Math.min(trainingSetPivot, 30000);
         var trainingSet = preliminaryWords.slice(0, trainingSetPivot).join(' ');
         var validationSet = preliminaryWords.slice(trainingSetPivot).join(' ');
         var words = task('extractWords', () => Morphology.extractWords(trainingSet));
@@ -119,8 +120,15 @@ onmessage = (e) => {
 
         var highScore = 0;
         var numReclusteringsToKeep = 100;
-        var numBuckets = 10;
 
+        dependencies.originalInfo =
+            Morphology.getClusterInfo(
+                null,
+                firstPassClusters,
+                dependencies.adjacencyMatrix,
+                dependencies.morphemeMapping,
+                dependencies.commutations
+            );
 
         var firstReclustering = true;
 
@@ -142,13 +150,12 @@ onmessage = (e) => {
                         }
                     }
                 }
-
             }
+            var reclustering = task('doSecondPassClustering', () => Morphology.recluster(clusters, dependencies, firstReclustering ? progress('doSecondPassClustering') : null));
+            reclusterings.push(reclustering);
             reclusterings.sort((l, r) => r.score - l.score);
-            //console.log(JSON.stringify(reclusterings.map((x) => x.score)));
-            var span = reclusterings.length;
-            if (Math.random() < 0.5) {
-                span = Math.sqrt(span);
+            if (reclusterings.length > numReclusteringsToKeep) {
+                reclusterings.pop();
             }
             var pick = Math.floor(span * Math.random());
             var clusters = Array.from(reclusterings[pick].clusters);
@@ -161,7 +168,7 @@ onmessage = (e) => {
                 continue;
             }
             highScore = reclustering.score;
-            task('beginPayload', () => true);
+            task('doSecondPassClustering', () => reclustering.clusters);
             task('score', () => reclustering.score);
             task('inventWords', () => reclustering.inventedWords);
             var translation = {};

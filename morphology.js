@@ -13,14 +13,13 @@ Morphology = {
     maxNumPrimaryCommutations: 3000,
     clusteringIntensity: 100,
     numSecondPassClusteringOuterIterations: 1,
-    minGain: 0.0001,
+    minGain: 0.001,
     commutations: [],
     checkSubsets: false,
     phonotacticPenalty: 50,
     numClusteringOperations: 10000,
     precisionMultiplier: 1,
     recallMultiplier: 1,
-    MDLMultiplier: 1,
     numReclusteringIterations: 10,
     MDLUpperBound: 300,
     maxNumClusters: 1000,
@@ -433,7 +432,7 @@ Morphology = {
         var beginningOfText = text.slice(0, 100000);
         for (var morpheme of relevantMorphemes) {
             progressCallback(progress++, relevantMorphemes.length);
-            frequencies[morpheme] = beginningOfText.split(morpheme).length - 1;
+            frequencies[morpheme] = (beginningOfText.match(new RegExp(morpheme, 'g')) || []).length;
         }
         relevantMorphemes.sort((l, r) => frequencies[r] - frequencies[l]);
         relevantMorphemes = relevantMorphemes.slice(0, Morphology.pruningThreshold);
@@ -526,11 +525,11 @@ Morphology = {
 
         var clusterByMorphemeId = [];
         clusterByMorphemeId.fill(null, 0, Object.values(morphemeMapping).reduce((c1, c2) => Math.max(), 0));
-        var morphemeListByCluster = {0: []};
+        var morphemeListByCluster = {};
 
-        var signatureByCluster = [null];
+        var signatureByCluster = [];
 
-        var numClusters = 1;
+        var numClusters = 0;
 
         for (var affix of affixes) {
             signatureByCluster[numClusters] = null;
@@ -567,7 +566,7 @@ Morphology = {
         var result = [];
 
         for (var i = 0; i < adjacencyMatrix.length; i++) {
-            result.push(clusterByMorphemeId[i] || 0);
+            result.push(clusterByMorphemeId[i]);
         }
 
         Morphology.firstPassClusterCount = numClusters;
@@ -862,6 +861,8 @@ Morphology = {
         var invent = () =>
             Morphology.getInventedWords(dependencies.numValidationWords, dependencies.validationPrefixTree, dependencies.numValidationWords, info, null, null, dependencies.trainingWords);
 
+        var info = dependencies.originalInfo;
+
         var output = Array.from(input);
         var count = input.reduce((a, x) => Math.max(a, x), 0) + 1;
         var highScore = evaluate(input);
@@ -947,6 +948,10 @@ Morphology = {
             inventedWords: invent(),
             history: history
         };
+    },
+
+    applyMergers: () => {
+        // TODO
     },
 
     subsets: (n) => {
@@ -1096,9 +1101,9 @@ Morphology = {
         for (var i = 0; i < numClusters; i++) {
             result.push({});
             result[i].id = i;
-            result[i].disabled = (i == 0);
+            result[i].disabled = false;
             result[i].morphemes = [];
-            result[i].affix = (i == 0);
+            result[i].affix = false;
             result[i].site = null;
             result[i].successors = new Set;
             result[i].predecessors = new Set;
@@ -1112,7 +1117,6 @@ Morphology = {
                 }
             }
             result[i].morphemes.sort();
-            result[i].boundary = ['⋊', '⋉'].includes(result[i].morphemes[0]);
         }
         for (var [m1, m2] of adjacencyList) {
             result[clusters[m1]].successors.add(result[clusters[m2]]);
@@ -1127,7 +1131,6 @@ Morphology = {
             instances[cluster.id] = {
                 id: cluster.id,
                 disabled: cluster.disabled,
-                boundary: cluster.boundary,
                 affix: cluster.affix,
                 site: cluster.site,
                 host: null,
@@ -1160,8 +1163,8 @@ Morphology = {
 
     updateClusterInfo: function(clusters, operation) {
         if (operation.type == 'merge') {
-            var first = clusters[operation.first];
-            var second = clusters[operation.second];
+            var first = clusters.filter((c) => c.id == operation.first)[0];
+            var second = clusters.filter((c) => c.id == operation.second)[0];
             for (var cluster of clusters) {
                 for (var relation of ['successors', 'predecessors']) {
                     if (cluster[relation].has(second)) {
@@ -1182,7 +1185,6 @@ Morphology = {
                     first.morphemes.push(morpheme);
                 }
             }
-            first.morphemes = Array.from(new Set(first.morphemes));
             second = null;
             clusters[operation.second] = first;
         }
@@ -1279,7 +1281,6 @@ Morphology = {
                 cluster.numEndingPaths += Math.max(predecessor.numEndingPaths, 1) * cluster.morphemes.length;
                 for (var explanation of predecessor.explanations) {
                     for (var morpheme of cluster.morphemes) {
-                        morpheme = Morphology.removeSubscripts(morpheme);
                         if (Morphology.searchPrefixTree(validationPrefixTree, explanation + morpheme).length > 0) {
                             cluster.explanations.add(explanation + morpheme);
                         }
@@ -1289,14 +1290,7 @@ Morphology = {
         }
         var total = final.numEndingPaths;
         var explained = final.explanations.size;
-        var descriptionLength = new Set(clusterInfo.map((c) => c.id)).size;
-        var normalizingFactor = (1 / (Morphology.precisionMultiplier + Morphology.recallMultiplier + Morphology.MDLMultiplier));
-        var scoring = {
-            precision: Morphology.precisionMultiplier * explained / total,
-            recall: Morphology.recallMultiplier * explained / numValidationWords,
-            MDL: Morphology.MDLMultiplier * (1 - Math.min(1, descriptionLength / Morphology.MDLUpperBound))
-        }
-        return normalizingFactor * (scoring.precision + scoring.recall + scoring.MDL);
+        return (1 / (Morphology.precisionMultiplier + Morphology.recallMultiplier)) * (Morphology.precisionMultiplier * explained / total + Morphology.recallMultiplier * explained / numValidationWords);
     },
 
     getInventedWords: (limit, validationPrefixTree, numValidationWords, clusterInfo, initial, final, words) => {
@@ -1313,7 +1307,7 @@ Morphology = {
                         continue;
                     }
                     for (var m of next.morphemes) {
-                        for (var sub of invent(next, w + Morphology.removeSubscripts(m), n - 1)) {
+                        for (var sub of invent(next, w + m, n - 1)) {
                             yield sub;
                         }
                     }
