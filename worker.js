@@ -95,6 +95,7 @@ onmessage = (e) => {
 
         task('restoreStateFromCache', () => {
             var i = 0;
+            debugger;
             if (e.data.parameters.clusterings) {
                 try {
                     for (var clustering of e.data.parameters.clusterings) {
@@ -174,7 +175,7 @@ onmessage = (e) => {
             //var layout = task('generateLayout', () => Morphology.generateLayout(Object.keys(morphemeMapping).length, clustersToSend, null, renumberedInfo, e.data.canvasWidth, e.data.canvasHeight, e.data.vertexRadius, (p, t) => null));
             //var edges = task('getRelevantEdges', () => Morphology.getRelevantEdges(adjacencyList, morphemeMapping, clustersToSend, renumberedInfo, (p, t) => null));
             task('getClusterings', () => reclusterings.map((r) => ({history: r.history})));
-            task('network', () => Morphology.network(info));
+            task('network', () => Morphology.network(reclustering.info));
             task('ready', () => null);
             firstReclustering = false;
         }
