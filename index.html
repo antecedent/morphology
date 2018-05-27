@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Savarankiška morfemų paieška tekste</title>
+    <style type="text/css">
+        * {
+            font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
+        }
+
+        #time-series {
+            height: 400px;
+            margin: 20px;
+        }
+
+        .tasks li {
+            color: gray;
+        }
+
+        .tasks li.completed {
+            color: green;
+        }
+
+        .tasks li.initiated, .tasks li.progress {
+            color: black;
+        }
+
+        .tasks li.failed {
+            color: crimson;
+        }
+
+        canvas {
+            display: block;
+            margin: 0 auto;
+        }
+
+        .cluster a, .morphotactics a {
+            margin: 10px;
+            margin-right: 30px;
+            display: block;
+            float: left;
+        }
+
+        .cluster, .morphotactics {
+            overflow: auto;
+            background: #EEE;
+            margin: 10px;
+            padding: 10px;
+            transition: background 0.2s linear;
+        }
+
+        .morphotactics {
+            background: #555;
+            color: white;
+            max-height: 100px;
+        }
+
+        .cluster:hover {
+            background: #EEF8FF;
+        }
+
+        .cluster p, .morphotactics p {
+            font-size: 14px;
+        }
+
+        .divergence-notice {
+            padding: 15px;
+            margin: 15px 10px;
+            background: lightyellow;
+        }
+
+        .success {
+            color: lightgreen;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/luminous-lightbox/2.0.0/luminous-basic.min.css">
+
+    <script
+      src="https://code.jquery.com/jquery-3.3.1.min.js"
+      integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+      crossorigin="anonymous"></script>
+    <script src="visualization.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/luminous-lightbox/2.0.0/Luminous.min.js"></script>
+    <script>
+        $(() => {
+            window.readyToRender = false;
+
+            window.timeSeries = [];
+
+            window.results = {};
+
+            window.connectionOpen = false;
+
+            window.rendering = false;
+
+            window.firstRendering = true;
+
+            window.renderedScore = 0;
+
+            window.imagesOn = false;
+
+            window.autoRefresh = true;
+
+            window.worker = null;
+
+            window.setInterval(() => {
+                Plotly.newPlot('time-series', [{
+                    type: 'scatter',
+                    mode: 'lines',
+                    x: timeSeries.map((t) => t.time),
+                    y: timeSeries.map((t) => t.score)
+                }]);
+            }, 1000);
+
+            window.setInterval(() => {
+                showResults();
+            }, 5000);
+
+            $('#auto-refresh').change(function () {
+                autoRefresh = $(this).is(':checked');
+            });
+
+            $('#images-on').change(function() {
+                if (worker) {
+                    worker.postMessage({sendImages: $(this).is(':checked')});
+                }
+            });
+
+            window.showResults = () => {
+                if (!results || !results.score || !readyToRender || window.rendering || !autoRefresh) {
+                    return;
+                }
+                if (imagesOn == $('#images-on').is(':checked') && results.score <= renderedScore) {
+                    return;
+                }
+                imagesOn = $('#images-on').is(':checked');
+                var score = results.score;
+                var renderingParameters = [results.renumberClusters[0],
+                results.getAdjacencyMatrix[1],
+                results.getRelevantEdges,
+                results.generateLayout];
+                window.rendering = true;
+                $('.tasks li[data-task=render]').addClass('progress');
+                var k = 0;
+                var clusterInfo = results.getClusterInfo;
+                if (clusterInfo.length == 0) {
+                    window.rendering = false;
+                }
+
+                var renderSingleImage = (image) => {
+                    if (!clusterInfo[k]) {
+                        clusterInfo[k] = {
+                            morphemes: []
+                        };
+                    }
+                    if (k == 0 || clusterInfo[k].morphemes.length == 0) {
+                        if (image) {
+                            k++;
+                        }
+                        return;
+                    }
+                    var hue = parseInt(33 * (k % 10));
+                    var div = $('<div class="cluster">');
+                    if (!window.firstRendering) {
+                        div.addClass('hidden');
+                    }
+                    if ($('#images-on').is(':checked')) {
+                        var img = $('<img>').attr('src', image).attr('width', 200).attr('height', 200);
+                        var a = $('<a>').attr('href', image).append(img).appendTo(div);
+                        new Luminous(a[0]);
+                    }
+                    var h3 = $('<h3>' + k + ' grupė <span style="color: hsl(' + hue + ', 100%, 50%);">&bull;</span></h3>').appendTo(div);
+                    //$('<p><em>' + (results.getClusterInfo[k].open ? 'Atvira klasė' : 'Uždara klasė') + '</em></p>').appendTo(div);
+                    var morphemes = clusterInfo[k].morphemes.map(Visualization.removeSubscripts);
+                    var subtypeCount = {};
+                    for (var morpheme of morphemes) {
+                        if (!subtypeCount.hasOwnProperty(morpheme)) {
+                            subtypeCount[morpheme] = 0;
+                        }
+                        subtypeCount[morpheme]++;
+                    }
+                    morphemes = Array.from(Object.keys(subtypeCount)).map((m) => {
+                        if (subtypeCount[m] > 1) {
+                            m += ` (${subtypeCount[m]})`;
+                        }
+                        return m;
+                    });
+                    var p = $('<p>' + (morphemes.join(', ')) + '</p>').appendTo(div);
+                    $('.results-section').append(div);
+                    if (image) {
+                        k++;
+                    }
+                    if (k == Math.min(clusterInfo.length, Visualization.maxNumClusters) && image) {
+                        if (!window.firstRendering) {
+                            $('.results-section > .cluster:not(.hidden)').remove();
+                        }
+                        $('.results-section > .cluster.hidden').removeClass('hidden');
+                        window.rendering = false;
+                        window.firstRendering = false;
+                        window.renderedScore = score;
+                    }
+                };
+
+                if ($('#images-on').is(':checked')) {
+                    Visualization.createImages(
+                        renderingParameters[0],
+                        renderingParameters[1],
+                        renderingParameters[2],
+                        renderingParameters[3],
+                        renderSingleImage
+                    );
+                } else {
+                    for (k = 0; k < clusterInfo.length; k++) {
+                        renderSingleImage(null);
+                    }
+                    if (!window.firstRendering) {
+                        $('.results-section > .cluster:not(.hidden)').remove();
+                    }
+                    $('.results-section > .cluster.hidden').removeClass('hidden');
+                    window.rendering = false;
+                    window.firstRendering = false;
+                    window.renderedScore = score;
+                }
+                $('.tasks li[data-task=render]').removeClass().addClass('completed');
+                $('section:not(.results-section)').hide();
+                $('.results-section').show();
+                var validation = results.getValidationSet;
+                if (validation instanceof Array) {
+                    validation = new Set(validation);
+                } else if (!(validation instanceof Set)) {
+                    validation = new Set;
+                }
+                var neologisms = results.inventWords.map((w) => {
+                    if (validation.has(w)) {
+                        return '<span class="success">' + w + '</span>';
+                    }
+                    return w;
+                });
+                neologisms.sort();
+                $('.neologisms').html(neologisms.join(', '));
+                var percentage = results.score * 100;
+                var d = new Date;
+                $('.success-rate').text(percentage.toFixed(2).replace('.', ','));
+                if (isNaN(percentage)) {
+                    $('.morphotactics').hide();
+                }
+                if (isNaN(percentage) || percentage == 0) {
+                    $('.divergence-notice').show();
+                }
+
+            };
+
+            var hash = (text) => [
+                text.length,
+                text.substring(0, 1000).replace(/:/g, ''),
+                text.substring(text.length - 1000, text.length).replace(/:/g, ''),
+                parameters.numSalientSubstrings,
+                parameters.preferredMorphemeLength,
+                parameters.minCommutationStrength,
+                parameters.trainingSetProportion1,
+                parameters.trainingSetProportion2
+            ].join(':');
+
+            var run = (text) => {
+                window.parameters = {};
+                $('.parameters-section input').each(function () {
+                    parameters[$(this).data('key')] = parseFloat($(this).val());
+                    if ($(this).is('[type=checkbox]')) {
+                        parameters[$(this).data('key')] = $(this).is(':checked');
+                    }
+                    if (isNaN(parameters[$(this).data('key')])) {
+                        return;
+                    }
+                });
+                var textKey = hash(text);
+                if (localStorage.getItem(textKey)) {
+                    parameters.commutations = JSON.parse(localStorage.getItem(textKey));
+                }
+                var clusteringsKey = [textKey, 'clusterings', parameters.precisionMultiplier, parameters.recallMultiplier, parameters.MDLMultiplier].join(':');
+                if (localStorage.getItem(clusteringsKey)) {
+                    parameters.clusterings = JSON.parse(localStorage.getItem(clusteringsKey));
+                }
+                // var iterator = $('.iteration');
+                // for (var i = parseInt(Math.log(parameters.pruningThreshold) / Math.log(3)) + 5; i > 0; i--) {
+                //     $(iterator[0].outerHTML.replace(new RegExp('{' + iterator.data('counter') + '}', 'g'), i)).insertAfter(iterator);
+                // }
+                // iterator.detach();
+                $('.texts-section, .parameters-section').hide();
+                worker = new Worker('worker.js');
+                $('.tasks li').removeClass();
+                $('.progress').text('0');
+                worker.onmessage = (e) => {
+                    var element = $('.tasks li[data-task="?"]'.replace('?', e.data.task));
+                    element.removeClass().addClass(e.data.state);
+                    if (e.data.state == 'progress') {
+                        $('[data-task="?"] .progress'.replace('?', e.data.task)).text(e.data.progress);
+                    }
+                    if (e.data.state == 'completed') {
+                        element.find('.progress').text('100');
+                        var key = e.data.task.replace(/\.\d+$/, '');
+                        results[key] = e.data.result;
+                        if (e.data.task == 'refineCommutations') {
+                            try {
+                                localStorage.setItem(textKey, JSON.stringify(e.data.result.map((c) => [Array.from(c[0]), c[1], c[2]])));
+                            } catch (error) {
+                                console.log('Local storage quota exceeded.');
+                                //localStorage.clear();
+                            }
+                        }
+                        if (e.data.task == 'getClusterings') {
+                            try {
+                                localStorage.setItem([textKey, 'clusterings'].join(':'), JSON.stringify(e.data.result));
+                            } catch (error) {
+                                console.log('Local storage quota exceeded.');
+                                //localStorage.clear();
+                            }
+                        }
+                        if (e.data.task == 'ready') {
+                            readyToRender = true;
+                            connectionOpen = false;
+                            showResults();
+                        }
+                        if (e.data.task == 'beginPayload') {
+                            connectionOpen = true;
+                        }
+                        if (e.data.task == 'score') {
+                            function pad (str, max) {
+                                str = str.toString();
+                                return str.length < max ? pad("0" + str, max) : str;
+                            }
+                            var d = new Date;
+                            timeSeries.push({
+                                time: `${d.getFullYear()}-${pad(d.getMonth() + 1, 2)}-${pad(d.getDate(), 2)} ${pad(d.getHours(), 2)}:${pad(d.getMinutes(), 2)}:${pad(Math.floor(d.getSeconds()), 2)}`,
+                                score: results.score * 100
+                            });
+                        }
+                        if (e.data.task == 'segment') {
+                            $('.preparing-segments').hide();
+                            $('.download-segments').show();
+                        }
+                        if (e.data.task == 'done') {
+                            worker.terminate();
+                        }
+                    }
+                    if (e.data.state == 'failed') {
+                        worker.terminate();
+                        console.log(e.data.stack);
+                    }
+                };
+                worker.postMessage({
+                    text: text,
+                    vertexRadius: Visualization.vertexRadius,
+                    canvasWidth: Visualization.width,
+                    canvasHeight: Visualization.height,
+                    parameters: parameters
+                });
+            };
+
+            $('.texts a').click(function () {
+                if ($(this).data('src').endsWith('.json')) {
+                    $.getJSON($(this).data('src'), (data) => {
+                        window.results = data;
+                        showResults();
+                    });
+                } else {
+                    $.get($(this).data('src'), run);
+                }
+                return false;
+            });
+
+            $('#upload').change(function () {
+                var reader = new FileReader;
+                var file = document.getElementById('upload').files[0];
+                reader.readAsText(file);
+                if (file.name.endsWith('.json')) {
+                    reader.onloadend = () => {
+                        window.results = JSON.parse(reader.result);
+                        showResults();
+                    };
+                } else {
+                    reader.onloadend = () => run(reader.result);
+                }
+            });
+
+            $('.download-segments a').click(function() {
+                var element = document.createElement('a');
+                var blob = new Blob([results.segment[1]], {type: 'text/plain'});
+                element.setAttribute('href', URL.createObjectURL(blob));
+                element.setAttribute('download', 'segments-' + (new Date).toISOString().replace(/[^\d]/g, '') + '.txt');
+                element.style.display = 'none';
+                document.body.appendChild(element);
+                element.click();
+                document.body.removeChild(element);
+                return false;
+            });
+
+            $('.download-results').click(function() {
+                var element = document.createElement('a');
+                results.getValidationSet = Array.from(results.getValidationSet);
+                var blob = new Blob([JSON.stringify(results)], {type: 'text/plain'});
+                element.setAttribute('href', URL.createObjectURL(blob));
+                element.setAttribute('download', 'results-' + (new Date).toISOString().replace(/[^\d]/g, '') + '.json');
+                element.style.display = 'none';
+                document.body.appendChild(element);
+                element.click();
+                document.body.removeChild(element);
+                return false;
+            });
+        });
+    </script>
+</head>
+<body>
+    <h1>Savarankiška (<em>unsupervised</em>) <abbr title="šaknų, priesagų, priešdėlių, galūnių">morfemų</abbr> paieška tekste</h1>
+    <p>&copy; 2018 Ignas Rudaitis</p>
+    <section class="texts-section">
+        <h2>Pasirinkite tekstą</h2>
+        <p>Numatytieji tekstai imami iš <a href="https://www.gutenberg.org/"><em>Project Gutenberg</em></a> ir <a href="http://www.antologija.lt/"><em>Antologija.lt</em></a>.</p>
+        <dl>
+            <dt>Atidaryti failą</dt>
+            <dd>
+                <p><input id="upload" type="file"></p>
+                <p><em>Pastabos.</em> Failas iš vietinio įrenginio niekur nesiunčiamas. Priimami tik grynojo teksto (.txt) failai bei šios programos išsaugotų rezultatų failai.</p>
+            </dd>
+
+            <dt>Anglų kalba</dt>
+            <dd>
+                <ul class="texts">
+                    <li><a href="#" data-src="pg730.txt">Charles Dickens. <em>Oliver Twist</em></a></li>
+                </ul>
+            </dd>
+
+            <dt>Danų kalba</dt>
+            <dd>
+                <ul class="texts">
+                    <li><a href="#" data-src="pg41956.txt">Knud Hjortø. <em>Hans Råskov</em></a></li>
+                </ul>
+            </dd>
+
+            <dt>Ispanų kalba</dt>
+            <dd>
+                <ul class="texts">
+                    <li><a href="#" data-src="54436-0.txt">Pedro Calderón de la Barca. <em>Teatro selecto, tomo 1 de 4</em></a></li>
+                </ul>
+            </dd>
+
+            <dt>Latvių kalba</dt>
+            <dd>
+                <ul class="texts">
+                    <li>
+                        <a href="#" data-src="latvian.txt">30 000 sakinių tekstynas iš naujienų straipsnių (Leipzigo universitetas)</a>
+                        <!-- <ul>
+                            <li><a href="#" data-src="results-20180518125916687.json">Gatava analizė (3,93% generavimo tikslumas)</a></li>
+                        </ul> -->
+                    </li>
+                </ul>
+            </dd>
+
+            <dt>Lietuvių kalba</dt>
+            <dd>
+                <ul class="texts">
+                    <li><a href="#" data-src="lt.txt">Vincas Mykolaitis-Putinas. <em>Altorių šešėly</em> (ištrauka)</a></li>
+                    <li>
+                        <a href="#" data-src="lithuanian.txt">100 000 sakinių tekstynas iš naujienų straipsnių (Leipzigo universitetas)</a>
+                        <!-- <ul>
+                            <li><a href="#" data-src="results-20180518174312574.json">Gatava analizė (3,69% generavimo tikslumas)</a></li>
+                        </ul> -->
+                    </li>
+                </ul>
+            </dd>
+
+            <dt>Rusų kalba</dt>
+            <dd>
+                <ul class="texts">
+                    <li><a href="#" data-src="14741-0.txt">Гавриил Романович Державин. <em>Духовные оды</em></a></li>
+                    <li>
+                        <a href="#" data-src="russian.txt">30 000 sakinių tekstynas iš naujienų straipsnių (Leipzigo universitetas)</a>
+                        <!-- <ul>
+                            <li><a href="#" data-src="results-20180518132643927.json">Gatava analizė (3,18% generavimo tikslumas)</a></li>
+                        </ul> -->
+                    </li>
+                </ul>
+            </dd>
+
+            <dt>Suomių kalba</dt>
+            <dd>
+                <ul class="texts">
+                    <li><a href="#" data-src="pg7000.txt"><em>Kalevala</em> (surinko Elias Lönnrot)</a></li>
+                </ul>
+            </dd>
+
+            <dt>Vokiečių kalba</dt>
+            <dd>
+                <ul class="texts">
+                    <li><a href="#" data-src="pg2230.txt">Johann Wolfgang von Goethe. <em>Faust: Der Tragödie zweiter Teil</em></a></li>
+                </ul>
+            </dd>
+        </dl>
+    </section>
+    <section class="parameters-section">
+        <h2>Parametrai</h2>
+        <table>
+            <!-- <tr>
+                <td>Kaimynysčių įtraukties koeficientas</td>
+                <td><input type="number" data-key="edgeThresholdFactor" value="5"></td>
+            </tr> -->
+            <tr>
+                <td>Įsimintinų raidžių samplaikų skaičius</td>
+                <td><input data-key="numSalientSubstrings" type="number" value="3000"></td>
+            </tr>
+            <tr>
+                <td>Idealus įsimintinos samplaikos ilgis</td>
+                <td><input data-key="preferredMorphemeLength" type="number" value="3"></td>
+            </tr>
+            <tr>
+                <td>Minimalus komutaciją įrodančių žodžių skaičius</td>
+                <td><input data-key="minCommutationStrength" type="number" value="100"></td>
+            </tr>
+            <tr>
+                <td>Maksimalus komutacijų skaičius iki tikslinimo</td>
+                <td><input data-key="maxNumPrimaryCommutations" type="number" value="3000"></td>
+            </tr>
+            <tr>
+                <td>Maksimalus aktualių morfemų skaičius</td>
+                <td><input data-key="pruningThreshold" type="number" value="2000"></td>
+            </tr>
+            <tr>
+                <td>Apmokymui ir validavimui skirto teksto proporcija</td>
+                <td><input data-key="trainingSetProportion1" value="1" type="number" style="width: 4em;"> : <input data-key="trainingSetProportion2" value="1" type="number" style="width: 4em;"></td>
+            </tr>
+            <!-- <tr>
+                <td>Grupavimo operacijų skaičius</td>
+                <td><input data-key="numClusteringOperations" type="number" value="300"></td>
+            </tr> -->
+            <tr>
+                <td>Preciziškumo, atgaminimo ir MDL santykinė svarba</td>
+                <td><input data-key="precisionMultiplier" type="number" value="50" style="width: 3em;"> : <input data-key="recallMultiplier" type="number" value="50" style="width: 3em;"> : <input data-key="MDLMultiplier" type="number" value="2" style="width: 3em;"></td>
+            </tr>
+            <!-- <tr>
+                <td>Perrinkti grupavimo sprendimų poaibius</td>
+                <td><input data-key="checkSubsets" type="checkbox"></td>
+            </tr> -->
+            <!-- <tr>
+                <td>Klasės uždarumo slenksčio koeficientas</td>
+                <td><input type="number" data-key="openClassThresholdFactor" value="100"></td>
+            </tr> -->
+        </table>
+    </section>
+    <section class="progress-section">
+        <h2>Eiga</h2>
+        <ul class="tasks">
+            <li data-task="extractWords">Išrinkti žodžius</li>
+            <li data-task="makePrefixTree">Sudaryti duomenų struktūrą apmokymui skirtų žodžių paieškai (<span class="progress">0</span>%)</li>
+            <li data-task="makeValidationPrefixTree">Sudaryti duomenų struktūrą vertinimui skirtų žodžių paieškai (<span class="progress">0</span>%)</li>
+            <li data-task="getSalientSubstrings">Rasti dažnai pasikartojančias raidžių samplaikas</li>
+            <li data-task="commute">Atlikti komutacijų testus (<span class="progress">0</span>%)</li>
+            <li data-task="refineCommutations">Patikslinti komutacijų testų rezultatus (<span class="progress">0</span>%)</li>
+            <li data-task="getBigrams">Sužymėti galimų morfemų kaimynystę</li>
+            <li data-task="getMorphemes">Paskelbti kandidatines morfemas</li>
+            <li data-task="getAdjacencyMatrix">Sudaryti kaimynystės matricą (<span class="progress">0</span>%)</li>
+            <li data-task="restoreStateFromCache">Atkurti ankstesnės analizės rezultatus (<span class="progress">0</span>%)</li>
+            <!--<li data-task="doFirstPassClustering">Sugrupuoti morfemas pagal kaimynystės savybes</li>-->
+            <!-- <li data-task="generateLayout">Išdėstyti kaimynystės schemą plokštumoje (<span class="progress">0</span>%)</li>
+            <li data-task="getRelevantEdges">Išrinkti rodykles iš kaimynystės matricos (<span class="progress">0</span>%)</li> -->
+            <li data-task="doSecondPassClustering">Sugrupuoti morfemas pagal kaimynystės savybes (<span class="progress">0</span>%)</li>
+            <!--<li class="iteration" data-counter="i">
+                <strong>{i} bandymas grupuoti kandidatines morfemas:</strong>
+                <ul>
+                    <li data-task="doSecondPassClustering.{i}">Patikslinti morfemų grupavimą (<span class="progress">0</span>%)</li>
+                    <li data-task="renumberClusters.{i}">Atnaujinti grupių numeraciją</li>
+                    <li data-task="getClusterInfo.{i}">Nustatyti morfemų grupių tipus</li>
+                    <li data-task="inventWords.{i}">Kurti naujadarus (<span class="progress">0</span>%)</li>
+                </ul>
+            </li>
+        -->
+            <!-- <li data-task="render">Nupiešti kaimynystės diagramas (<span class="progress">0</span>%)</li> -->
+        </ul>
+    </section>
+    <section class="results-section" style="display: none;">
+        <h2>Rezultatai</h2>
+        <p><a href="" target="_blank">Analizuoti kitą tekstą (naujame skirtuke)</a></p>
+        <p><input id="auto-refresh" checked type="checkbox"> Atnaujinti informaciją automatiškai</p>
+        <p><input id="images-on" type="checkbox"> Rodyti morfotaktinius ryšius grafiškai</p>
+        <div id="time-series"></div>
+        <!-- <p class="preparing-segments" data-task="segment">Ruošiamas segmentuotas tekstas (<span class="progress">0</span>%)</p>
+        <p class="download-segments" style="display: none;"><a href="#" target="_blank">Atsisiųsti segmentuotą tekstą</a></p>
+        <p><a href="#" class="download-results" target="_blank">Išsaugoti analizės rezultatus vėlesnei peržiūrai</a></p> -->
+        <div class="divergence-notice" style="display: none;">
+            Naujadarų generavimas nedavė rezultatų. Gali reikėti pasirinkti ilgesnį tekstą arba tiesiog paleisti algoritmą dar kartą.
+        </div>
+        <div class="morphotactics">
+            <!--<a href="#"><img src="#"></a>-->
+            <h3>Modelio įvertis: <span class="success-rate">0</span>%</h3>
+            <p><strong>Modelio prognozuojami naujadarai:</strong> <span class="neologisms"></span></p>
+        </div>
+    </section>
+</body>
+</html>
