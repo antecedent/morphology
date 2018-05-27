@@ -1418,5 +1418,47 @@ Morphology = {
             }
         }
         return node.items;
+    },
+
+    network: (info) => {
+        var label = (cluster) => {
+            var max = 15;
+            var result = Morphology.shuffle(cluster.morphemes)[0].slice(0, max).map(Morphology.removeSubscripts).join(', ');
+            if (cluster.morphemes.length > max) {
+                result += ', ...';
+            }
+            return result;
+        };
+
+        var nodes = [];
+        var edges = [];
+
+        var visited = new Set;
+
+        for (var cluster of info) {
+            if (cluster.disabled || visited.has(cluster.id) || cluster.boundary) {
+                continue;
+            }
+
+            nodes.push({id: cluster.id, label: label(cluster)});
+            for (var successor of cluster.successors) {
+                if (successor.disabled || successor.boundary) {
+                    continue;
+                }
+                edges.push({from: cluster.id, to: successor.id});
+            }
+            visited.add(cluster.id);
+        }
+
+        var nonStrandedNodes = [];
+
+        for (var node of nodes) {
+            if (edges.filter((e) => e.from === node.id || e.to === node.id).length === 0) {
+                continue;
+            }
+            nonStrandedNodes.push(node);
+        }
+
+        return {nodes: nonStrandedNodes, edges: edges};
     }
 };

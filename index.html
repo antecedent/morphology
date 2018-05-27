@@ -52,7 +52,6 @@
         .morphotactics {
             background: #555;
             color: white;
-            max-height: 100px;
         }
 
         .cluster:hover {
@@ -77,9 +76,57 @@
             display: none;
         }
 
+        .network, .network-in-preparation {
+            width: 100vw;
+            height: 100vh;
+            position: fixed;
+            left: 0;
+            top: 0;
+            background: white;
+        }
+
+        .network {
+            z-index: 1;
+        }
+
+        .network-in-preparation {
+            z-index: 0;
+        }
+
+        header {
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+        }
+
+        .network .wait {
+            margin-top: 45vh !important;
+            font-size: 5vh;
+            text-align: center;
+        }
+
+        section, header {
+            margin: 20px;
+        }
+
+        section.results-section {
+            margin: 0;
+            padding: 0;
+        }
+
+        .status {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            z-index: 2;
+        }
+
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/luminous-lightbox/2.0.0/luminous-basic.min.css">
-
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
     <script
       src="https://code.jquery.com/jquery-3.3.1.min.js"
       integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
@@ -109,18 +156,61 @@
 
             window.worker = null;
 
-            window.setInterval(() => {
-                Plotly.newPlot('time-series', [{
-                    type: 'scatter',
-                    mode: 'lines',
-                    x: timeSeries.map((t) => t.time),
-                    y: timeSeries.map((t) => t.score)
-                }]);
-            }, 1000);
+            window.networkInterval = null;
+
+            // window.setInterval(() => {
+            //     Plotly.newPlot('time-series', [{
+            //         type: 'scatter',
+            //         mode: 'lines',
+            //         x: timeSeries.map((t) => t.time),
+            //         y: timeSeries.map((t) => t.score)
+            //     }]);
+            // }, 1000);
 
             window.setInterval(() => {
                 showResults();
-            }, 5000);
+            }, 10000);
+
+            window.networksDrawn = new Set;
+            window.drawingNetworkNow = false;
+
+            window.drawNetwork = () => {
+                if (!results.network || drawingNetworkNow) {
+                    return;
+                }
+                drawingNetworkNow = true;
+                var tag = Date.now();
+                results.network.nodes = new vis.DataSet(results.network.nodes);
+                results.network.edges = new vis.DataSet(results.network.edges);
+                var network = new vis.Network($('.network-in-preparation')[0], results.network, {
+                    edges: {
+                        arrows: 'to'
+                    },
+                    nodes: {
+                        widthConstraint: {
+                            maximum: 200
+                        }
+                    }
+                });
+                network.on('afterDrawing', () => {
+                    if (!networksDrawn.has(tag)) {
+                        drawingNetworkNow = false;
+                        var link = $('.update-network').show().find('a').click(() => {
+                            var newNetwork = $('.network-in-preparation');
+                            var oldNetwork = $('.network');
+                            oldNetwork.removeClass('network').addClass('network-in-preparation');
+                            newNetwork.removeClass('network-in-preparation').addClass('network');
+                            $('.update-network').hide();
+                            return false;
+                        });
+                        if (networksDrawn.size == 0) {
+                            $('.network').empty();
+                            link.trigger('click');
+                        }
+                        networksDrawn.add(tag);
+                    }
+                });
+            };
 
             $('#auto-refresh').change(function () {
                 autoRefresh = $(this).is(':checked');
@@ -154,6 +244,10 @@
                 }
 
                 var renderSingleImage = (image) => {
+
+                    // NOTE
+                    return;
+
                     if (!clusterInfo[k]) {
                         clusterInfo[k] = {
                             morphemes: []
@@ -321,9 +415,16 @@
                                 //localStorage.clear();
                             }
                         }
+                        if (e.data.task == 'network') {
+                            if (window.networkInterval === null) {
+                                drawNetwork();
+                                window.networkInterval = window.setInterval(drawNetwork, 60000);
+                            }
+                        }
                         if (e.data.task == 'ready') {
                             readyToRender = true;
                             connectionOpen = false;
+                            $('header').hide();
                             showResults();
                         }
                         if (e.data.task == 'beginPayload') {
@@ -416,8 +517,10 @@
     </script>
 </head>
 <body>
-    <h1>Savarankiška (<em>unsupervised</em>) <abbr title="šaknų, priesagų, priešdėlių, galūnių">morfemų</abbr> paieška tekste</h1>
-    <p>&copy; 2018 Ignas Rudaitis</p>
+    <header>
+        <h1>Savarankiška (<em>unsupervised</em>) <abbr title="šaknų, priesagų, priešdėlių, galūnių">morfemų</abbr> paieška tekste</h1>
+        <p>&copy; 2018 Ignas Rudaitis</p>
+    </header>
     <section class="texts-section">
         <h2>Pasirinkite tekstą</h2>
         <p>Numatytieji tekstai imami iš <a href="https://www.gutenberg.org/"><em>Project Gutenberg</em></a> ir <a href="http://www.antologija.lt/"><em>Antologija.lt</em></a>.</p>
@@ -582,22 +685,24 @@
         </ul>
     </section>
     <section class="results-section" style="display: none;">
-        <h2>Rezultatai</h2>
+        <!-- <h2>Rezultatai</h2>
         <p><a href="" target="_blank">Analizuoti kitą tekstą (naujame skirtuke)</a></p>
         <p><input id="auto-refresh" checked type="checkbox"> Atnaujinti informaciją automatiškai</p>
-        <p><input id="images-on" type="checkbox"> Rodyti morfotaktinius ryšius grafiškai</p>
-        <div id="time-series"></div>
+        <p><input id="images-on" type="checkbox"> Rodyti morfotaktinius ryšius grafiškai</p> -->
         <!-- <p class="preparing-segments" data-task="segment">Ruošiamas segmentuotas tekstas (<span class="progress">0</span>%)</p>
         <p class="download-segments" style="display: none;"><a href="#" target="_blank">Atsisiųsti segmentuotą tekstą</a></p>
         <p><a href="#" class="download-results" target="_blank">Išsaugoti analizės rezultatus vėlesnei peržiūrai</a></p> -->
-        <div class="divergence-notice" style="display: none;">
+        <!-- <div class="divergence-notice" style="display: none;">
             Naujadarų generavimas nedavė rezultatų. Gali reikėti pasirinkti ilgesnį tekstą arba tiesiog paleisti algoritmą dar kartą.
+        </div> -->
+        <div class="network">
+            <p class="wait">Prašome palaukti, ruošiamas morfotaktinio tinklo vaizdas...</p>
         </div>
-        <div class="morphotactics">
-            <!--<a href="#"><img src="#"></a>-->
-            <h3>Modelio įvertis: <span class="success-rate">0</span>%</h3>
-            <p><strong>Modelio prognozuojami naujadarai:</strong> <span class="neologisms"></span></p>
+        <div class="status">
+            <span class="success-rate">0</span>% tikslumas
+            <span class="update-network" style="display: none;"> &bull; <a href="#">Atnaujinti vaizdą</a></span>
         </div>
+        <div class="network-in-preparation"></div>
     </section>
 </body>
 </html>
