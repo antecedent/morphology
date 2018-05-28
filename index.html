@@ -9,8 +9,17 @@
         }
 
         #time-series {
-            height: 400px;
-            margin: 20px;
+            height: 300px;
+            width: 600px;
+        }
+
+        #plot-dialog {
+            font-size: 14px;
+        }
+
+        #invention-dialog {
+            overflow: auto;
+            font-size: 14px;
         }
 
         .tasks li {
@@ -69,7 +78,7 @@
         }
 
         .success {
-            color: lightgreen;
+            color: green;
         }
 
         .hidden {
@@ -116,21 +125,39 @@
             padding: 0;
         }
 
-        .status {
+        .status, .actions {
             position: fixed;
             bottom: 10px;
             left: 10px;
             z-index: 2;
         }
 
+        .actions {
+            left: auto;
+            right: 10px;
+        }
+
+        .actions a {
+            text-decoration: none;
+            color: black;
+            transition: color 0.2s linear;
+        }
+
+        .actions a:hover {
+            color: #39c;
+        }
+
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/luminous-lightbox/2.0.0/luminous-basic.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
     <script
       src="https://code.jquery.com/jquery-3.3.1.min.js"
       integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
       crossorigin="anonymous"></script>
+  <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
     <script src="visualization.js"></script>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/luminous-lightbox/2.0.0/Luminous.min.js"></script>
@@ -158,14 +185,7 @@
 
             window.networkInterval = null;
 
-            // window.setInterval(() => {
-            //     Plotly.newPlot('time-series', [{
-            //         type: 'scatter',
-            //         mode: 'lines',
-            //         x: timeSeries.map((t) => t.time),
-            //         y: timeSeries.map((t) => t.score)
-            //     }]);
-            // }, 1000);
+            window.paused = false;
 
             window.setInterval(() => {
                 showResults();
@@ -180,15 +200,39 @@
                 }
                 drawingNetworkNow = true;
                 var tag = Date.now();
-                results.network.nodes = new vis.DataSet(results.network.nodes);
-                results.network.edges = new vis.DataSet(results.network.edges);
-                var network = new vis.Network($('.network-in-preparation')[0], results.network, {
+                var nodes = new vis.DataSet(results.network.nodes);
+                var edges = new vis.DataSet(results.network.edges);
+                var network = new vis.Network($('.network-in-preparation')[0], {nodes: nodes, edges: edges}, {
                     edges: {
                         arrows: 'to'
                     },
                     nodes: {
                         widthConstraint: {
                             maximum: 200
+                        },
+                        font: {
+                            face: 'Roboto, "Segoe UI", Helvetica, Arial, sans-serif'
+                        }
+                    },
+                    // interaction: {
+                    //     selectable: false,
+                    //     hover: false
+                    // },
+                    groups: {
+                        leftMarginal: {
+                            color: '#CAEFC2'
+                        },
+                        left: {
+                            color: '#C2EFEB'
+                        },
+                        root: {
+                            color: '#C2DDEF'
+                        },
+                        right: {
+                            color: '#D4C2EF'
+                        },
+                        rightMarginal: {
+                            color: '#E8C2EF'
                         }
                     }
                 });
@@ -217,11 +261,6 @@
                 autoRefresh = $(this).is(':checked');
             });
 
-            $('#images-on').change(function() {
-                if (worker) {
-                    worker.postMessage({sendImages: $(this).is(':checked')});
-                }
-            });
 
             window.showResults = () => {
                 if (!results || !results.score || !readyToRender || window.rendering || !autoRefresh) {
@@ -422,11 +461,17 @@
                                 window.networkInterval = window.setInterval(drawNetwork, 10000);
                             }
                         }
+                        if (e.data.task == 'initialized') {
+                            window.setTimeout(() => worker.postMessage({action: 'run'}), 10);
+                        }
                         if (e.data.task == 'ready') {
                             readyToRender = true;
                             connectionOpen = false;
                             $('header').hide();
                             showResults();
+                            if (!paused) {
+                                window.setTimeout(() => worker.postMessage({action: 'run'}), 10);
+                            }
                         }
                         if (e.data.task == 'beginPayload') {
                             connectionOpen = true;
@@ -456,6 +501,7 @@
                     }
                 };
                 worker.postMessage({
+                    action: 'initialize',
                     text: text,
                     vertexRadius: Visualization.vertexRadius,
                     canvasWidth: Visualization.width,
@@ -512,6 +558,44 @@
                 document.body.appendChild(element);
                 element.click();
                 document.body.removeChild(element);
+                return false;
+            });
+
+            $('#pause').click(function() {
+                $(this).hide();
+                $('#resume').show();
+                paused = true;
+                return false;
+            });
+
+            $('#resume').click(function() {
+                $(this).hide();
+                $('#pause').show();
+                paused = false;
+                worker.postMessage({action: 'run'});
+                return false;
+            });
+
+            $('#plot').click(function() {
+                Plotly.newPlot('time-series', [{
+                    type: 'scatter',
+                    mode: 'lines',
+                    x: timeSeries.map((t) => t.time),
+                    y: timeSeries.map((t) => t.score)
+                }]);
+                $('#plot-dialog').dialog({width: 600, height: 400});
+                return false;
+            });
+
+            $('#invent').click(function() {
+                var inventions = results.inventWords.map((w) => {
+                    if (results.getValidationSet.has(w)) {
+                        return '<span class="success">' + w + '</span>';
+                    }
+                    return w;
+                });
+                inventions.sort();
+                $('#invention-dialog').html(inventions.join(', ')).dialog({width: 400, height: 300});
                 return false;
             });
         });
@@ -703,7 +787,19 @@
             <span class="success-rate">0</span>% tikslumas
             <span class="update-network" style="display: none;"> &bull; <a href="#">Atnaujinti vaizdą</a></span>
         </div>
+        <div class="actions">
+            <a id="plot" href="#" title="Įverčio kitimas laike"><i class="material-icons">insert_chart</i></a>
+            <a id="invent" href="#" title="Prognozuojami žodžiai"><i class="material-icons">star</i></a>
+            <a id="pause" href="#" title="Pristabdyti"><i class="material-icons">pause</i></a>
+            <a id="resume" style="display: none;" href="#" title="Tęsti"><i class="material-icons">play_arrow</i></a>
+        </div>
         <div class="network-in-preparation"></div>
     </section>
+    <div id="plot-dialog" style="display: none;" title="Įverčio kitimas laike">
+        <div id="time-series">
+        </div>
+    </div>
+    <div id="invention-dialog" style="display: none;" title="Prognozuojami žodžiai">
+    </div>
 </body>
 </html>

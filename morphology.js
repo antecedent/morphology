@@ -1291,7 +1291,13 @@ Morphology = {
         }
         initial.explanations.add('⋊');
         for (var cluster of Morphology.topologicalSort(clusterInfo)) {
+            if (cluster.disabled) {
+                continue;
+            }
             for (var predecessor of cluster.predecessors) {
+                if (predecessor.disabled) {
+                    continue;
+                }
                 cluster.numEndingPaths += Math.max(predecessor.numEndingPaths, 1) * cluster.morphemes.length;
                 for (var explanation of predecessor.explanations) {
                     for (var morpheme of cluster.morphemes) {
@@ -1456,7 +1462,7 @@ Morphology = {
                 continue;
             }
 
-            nodes.push({id: cluster.id, label: label(cluster)});
+            nodes.push({id: cluster.id, label: label(cluster), group: cluster.site || 'root'});
             for (var successor of cluster.successors) {
                 if (successor.disabled || successor.boundary) {
                     continue;
