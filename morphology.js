@@ -711,7 +711,10 @@ Morphology = {
 
         var resultLength = result.length;
 
+        var numRootsProcessed = 0;
+
         for (var root of roots) {
+            var lastIdBackup = id;
             var rootCopy = {
                 id: id++,
                 disabled: false,
@@ -732,16 +735,45 @@ Morphology = {
             }
             result.push(rootCopy);
             split(root, rootCopy, []);
-            if (numMorphemes > Morphology.pruningThreshold) {
+            if (result.length > Morphology.maxNumClusters) {
                 result = result.slice(0, resultLength);
+                id = lastIdBackup;
+            } else {
+                numRootsProcessed++;
             }
             resultLength = result.length;
         }
 
-        if (resultLength <= 3) {
-            console.log('The splitting procedure produced too many morphemes. Doubling the pruning threshold.');
-            Morphology.pruningThreshold *= 2;
-            return Morphology.splitMorphemes(originalInfo);
+        var toRenumber = [];
+        var visited = new Set;
+
+        var enqueueForRenumbering = (cluster) => {
+            visited.add(cluster.id);
+            for (var relation of ['successors', 'predecessors']) {
+                for (var neighbor of cluster[relation]) {
+                    if (!visited.has(neighbor.id)) {
+                        enqueueForRenumbering(neighbor);
+                        visited.add(neighbor.id);
+                    }
+                }
+            }
+        };
+
+        for (var cluster of roots.slice(resultLength)) {
+            enqueueForRenumbering(cluster);
+        }
+
+        for (var cluster of toRenumber) {
+            if (neighboredWithFinal.has(cluster.id)) {
+                cluster.successors.add(final);
+                final.predecessors.add(cluster);
+            }
+            if (neighboredWithInitial.has(cluster.id)) {
+                cluster.predecessors.add(initial);
+                initial.successors.add(cluster);
+            }
+            cluster.id = id++;
+            result.push(cluster);
         }
 
         for (var cluster of result) {
@@ -937,7 +969,7 @@ Morphology = {
                 continue trialLoop;
             }
             var score = evaluate(candidate);
-            if (score > highScore || (initialNumClusters > Morphology.maxNumClusters && highScore - score < Morphology.minGain) || affixCascade.length > 0) {
+            if (score > highScore || affixCascade.length > 0) {
                 history.push([first, second]);
                 highScore = score;
                 output = candidate;
