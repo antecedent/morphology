@@ -778,10 +778,11 @@
                 <p><em>Notes:</em> The file will not be uploaded anywhere; all processing takes place in the browser. Only plain text files (.txt) are accepted.</p>
             </dd>
 
-            <dt>Use a corpus from the <a href="http://wortschatz.uni-leipzig.de/en/download">Leipzig Corpora Collection</a> (100K sentences each)</dt>
+            <dt>Use a corpus from the <a href="http://wortschatz.uni-leipzig.de/en/download">Leipzig Corpora Collection</a> (100K sentences each):</dt>
             <dd id="language">
                 <a href="#" data-src="eng_news_2016_100K-sentences.txt">English</a>
                 <a href="#" data-src="est_news_2014_100K-sentences.txt">Estonian</a>
+                <a href="#" data-src="fin_news_2005-2007_100K-sentences.txt">Finnish</a>
                 <a href="#" data-src="fra_news_2010_100K-sentences.txt">French</a>
                 <a href="#" data-src="kat_wikipedia_2016_100K-sentences.txt">Georgian</a>
                 <a href="#" data-src="deu_news_2015_100K-sentences.txt">German</a>
@@ -823,7 +824,7 @@
             </tr>
             <tr>
                 <td>Maximum # of morphemes to consider</td>
-                <td><input data-key="pruningThreshold" type="number" value="2000"></td>
+                <td><input data-key="pruningThreshold" type="number" value="10000"></td>
             </tr>
             <tr style="display: none;">
                 <td>Relative size of training/validation sets</td>
@@ -862,7 +863,7 @@
             <!--<li data-task="doFirstPassClustering">Sugrupuoti morfemas pagal kaimynystės savybes</li>-->
             <!-- <li data-task="generateLayout">Išdėstyti kaimynystės schemą plokštumoje (<span class="progress">0</span>%)</li>
             <li data-task="getRelevantEdges">Išrinkti rodykles iš kaimynystės matricos (<span class="progress">0</span>%)</li> -->
-            <li data-task="doSecondPassClustering">Cluster candidate morphemes (<span class="progress">0</span>%)</li>
+            <li data-task="doSecondPassClustering">Pre-cluster candidate morphemes (<span class="progress">0</span>%)</li>
             <!--<li class="iteration" data-counter="i">
                 <strong>{i} bandymas grupuoti kandidatines morfemas:</strong>
                 <ul>

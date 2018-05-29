@@ -119,7 +119,7 @@ Morphology = {
 
     extractWords: (text) => {
         var words = new Set;
-        for (var word of text.toLowerCase().split(/[\s\d]+/u)) {
+        for (var word of text.toLowerCase().split(/[\s\d:]+/u)) {
             word = word.replace(Morphology.leadingPunctuation, '');
             word = word.replace(Morphology.trailingPunctuation, '');
             words.add(word);
@@ -705,7 +705,7 @@ Morphology = {
             }
         };
         // NOTE: pruning
-        var roots = info.filter((i) => !i.affix);
+        var roots = info.filter((i) => !i.affix && i.successors.size > 0);
         var rootScore = (root) => root.morphemes.map((m) => m.length).reduce((a, x) => a + x, 0);
         roots.sort((l, r) => r.morphemes.length - l.morphemes.length);
 
@@ -875,6 +875,7 @@ Morphology = {
         var output = Array.from(input);
         var count = input.reduce((a, x) => Math.max(a, x), 0) + 1;
         var highScore = evaluate(input);
+        var baseline = highScore;
         var history = Array.from(history);
 
         var affixCascade = [];
@@ -921,10 +922,6 @@ Morphology = {
             var candidate = Array.from(output);
             if (affixCascade.length == 0) {
                 var [first, second] = [Math.random(), Math.random()].map((r) => Math.floor(r * count));
-                if (numClusters > Morphology.maxNumClusters && (info[first].affix || info[second].affix)) {
-                    iteration--;
-                    continue;
-                }
             } else {
                 var [first, second] = affixCascade[0];
             }
@@ -937,13 +934,10 @@ Morphology = {
                 if (affixCascade.length > 0) {
                     affixCascade.shift();
                 }
-                if (numClusters > Morphology.maxNumClusters) {
-                    iteration--;
-                }
                 continue trialLoop;
             }
             var score = evaluate(candidate);
-            if (score > highScore || affixCascade.length > 0) {
+            if (score > highScore || (initialNumClusters > Morphology.maxNumClusters && highScore - score < Morphology.minGain) || affixCascade.length > 0) {
                 history.push([first, second]);
                 highScore = score;
                 output = candidate;
@@ -1212,6 +1206,12 @@ Morphology = {
                 }
             }
             first.morphemes = Array.from(new Set(first.morphemes));
+            if (second.site == 'left') {
+                first.site = 'left';
+            }
+            if (second.site == 'right') {
+                first.site = 'right';
+            }
             second = null;
             clusters[operation.second] = first;
         }

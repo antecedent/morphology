@@ -49,7 +49,7 @@ var initialize = (e) => {
     preliminaryWords = e.data.text.split(/\s+/);
     Morphology.trainingSetProportion = Morphology.trainingSetProportion1 / Morphology.trainingSetProportion2;
     // NB the hardcoded value below
-    trainingSetPivot = Math.min(100000, Math.floor(preliminaryWords.length / (Morphology.trainingSetProportion + 1) * (Morphology.trainingSetProportion)));
+    trainingSetPivot = Math.min(200000, Math.floor(preliminaryWords.length / (Morphology.trainingSetProportion + 1) * (Morphology.trainingSetProportion)));
     trainingSet = preliminaryWords.slice(0, trainingSetPivot).join(' ');
     validationSet = preliminaryWords.slice(trainingSetPivot).join(' ');
     words = task('extractWords', () => Morphology.extractWords(trainingSet));
