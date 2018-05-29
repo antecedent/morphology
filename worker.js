@@ -48,7 +48,8 @@ var initialize = (e) => {
     }
     preliminaryWords = e.data.text.split(/\s+/);
     Morphology.trainingSetProportion = Morphology.trainingSetProportion1 / Morphology.trainingSetProportion2;
-    trainingSetPivot = Math.floor(preliminaryWords.length / (Morphology.trainingSetProportion + 1) * (Morphology.trainingSetProportion));
+    // NB the hardcoded value below
+    trainingSetPivot = Math.min(100000, Math.floor(preliminaryWords.length / (Morphology.trainingSetProportion + 1) * (Morphology.trainingSetProportion)));
     trainingSet = preliminaryWords.slice(0, trainingSetPivot).join(' ');
     validationSet = preliminaryWords.slice(trainingSetPivot).join(' ');
     words = task('extractWords', () => Morphology.extractWords(trainingSet));
@@ -180,10 +181,10 @@ var run = () => {
     task('doSecondPassClustering', () => clustersToSend);
     morphemesAsObject = {};
     for (var source of Object.keys(translation)) {
-        morphemesAsObject[translation[source]] = {morphemes: reclustering.info[source].morphemes};
+        morphemesAsObject[translation[source]] = reclustering.info[source];
     }
     renumberedInfo = Array.from(Object.values(morphemesAsObject));
-    task('getClusterInfo', () => renumberedInfo.map((i) => ({morphemes: i.morphemes})));
+    task('getClusterInfo', () => renumberedInfo);
     //var layout = task('generateLayout', () => Morphology.generateLayout(Object.keys(morphemeMapping).length, clustersToSend, null, renumberedInfo, e.data.canvasWidth, e.data.canvasHeight, e.data.vertexRadius, (p, t) => null));
     //var edges = task('getRelevantEdges', () => Morphology.getRelevantEdges(adjacencyList, morphemeMapping, clustersToSend, renumberedInfo, (p, t) => null));
     task('getClusterings', () => reclusterings.map((r) => ({history: r.history})));

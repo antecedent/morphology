@@ -2,10 +2,25 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Savarankiška morfemų paieška tekste</title>
+    <title>Unsupervised morphology induction using novel word prediction</title>
     <style type="text/css">
         * {
             font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
+        }
+
+        #language a {
+            display: inline-block;
+            padding: 10px;
+            margin: 10px;
+            background: #DDE2E8;
+            transition: background 0.2s linear;
+            text-decoration: none;
+            color: black;
+            border-radius: 5px;
+        }
+
+        #language a:hover {
+            background: #CEF;
         }
 
         #time-series {
@@ -163,6 +178,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/luminous-lightbox/2.0.0/Luminous.min.js"></script>
     <script>
         $(() => {
+            window.text = '';
+
             window.readyToRender = false;
 
             window.timeSeries = [];
@@ -194,6 +211,137 @@
             window.networksDrawn = new Set;
             window.drawingNetworkNow = false;
 
+            window.segmenting = false;
+
+            window.segmentationTimeouts = [];
+
+            window.segment = (progressCallback, doneCallback) => {
+
+                if (segmenting) {
+                    return;
+                }
+
+                segmenting = true;
+
+                var _text = window.text;
+                var info = results.getClusterInfo;
+                var trainingWords = results.extractWords;
+                var validationWords = results.getValidationSet;
+
+                var progress = 0;
+                var total = trainingWords.size + validationWords.size;
+
+                var allPrefixes = function* (string) {
+                    for (var i = 1; i <= string.length; i++) {
+                        yield string.substring(0, i);
+                    }
+                };
+
+                var segmentWord = (hypotheses, word, state, path, novel, root) => {
+                    if (!state) {
+                        for (var q of info) {
+                            if (!q.boundary && !q.disabled) {
+                                segmentWord(hypotheses, word, q, [], false, false);
+                            }
+                        }
+                        return hypotheses;
+                    }
+                    if (word === '') {
+                        if (state.boundary && root) {
+                            hypotheses.push({novel: novel, path: path});
+                        }
+                        return hypotheses;
+                    }
+                    for (var m of state.morphemes.map(Visualization.removeSubscripts)) {
+                        if (word.startsWith(m)) {
+                            for (var q of state.successors) {
+                                if (root && !q.affix && !q.boundary) {
+                                    continue;
+                                }
+                                if (q.disabled) {
+                                    continue;
+                                }
+                                segmentWord(hypotheses, word.substring(m.length), q, path.concat([m]), novel, root || !q.affix);
+                            }
+                        }
+                    }
+                    if (!novel && !state.affix) {
+                        for (var m of allPrefixes(word)) {
+                            for (var q of state.successors) {
+                                if (!q.disabled && (q.affix || q.boundary)) {
+                                    segmentWord(hypotheses, word.substring(m.length), q, path.concat([m]), true, true);
+                                }
+                            }
+                        }
+                    }
+                    return hypotheses;
+                };
+
+                var deploySegmentation = (word, hypotheses) => {
+                    var escapedWord = word.replace(/[.?*+^$[\]\\(){}|-]/g, "\\$&");
+                    if (hypotheses.filter((h) => !h.novel).length > 0) {
+                        hypotheses = hypotheses.filter((h) => !h.novel);
+                    }
+                    hypotheses.sort((l, r) => r.path.length - l.path.length);
+                    try {
+                        var segmentation = hypotheses[0].path.join('-');
+                    } catch (error) {
+                        debugger;
+                    }
+                    console.log(word, segmentation);
+                    var variations = [
+                        [escapedWord.toLowerCase(), segmentation.toLowerCase()],
+                        [escapedWord.toUpperCase(), segmentation.toUpperCase()],
+                        [escapedWord[0].toUpperCase() + escapedWord.substring(1).toLowerCase(), segmentation[0].toUpperCase() + segmentation.substring(1).toLowerCase()]
+                    ];
+                    for (var [pattern, replacement] of variations) {
+                        _text = _text.replace(new RegExp('([^\\w\']|^)(' + pattern + ')([^\\w\']|$)', 'g'), '$1' + replacement + '$3');
+                    }
+                };
+
+                for (var word of trainingWords) {
+                    if (!segmenting) {
+                        break;
+                    }
+                    if (word === '') {
+                        continue;
+                    }
+                    segmentationTimeouts.push(setTimeout(function (word) {
+                        if (!segmenting) {
+                            return;
+                        }
+                        progressCallback(progress++, total);
+                        deploySegmentation(word, segmentWord([], word));
+                        if (progress + 1 == total) {
+                            segmenting = false;
+                            segmentationTimeouts = [];
+                            doneCallback(_text);
+                        }
+                    }, 1, word));
+                }
+
+                for (var word of validationWords) {
+                    if (!segmenting) {
+                        break;
+                    }
+                    if (word === '') {
+                        continue;
+                    }
+                    segmentationTimeouts.push(setTimeout(function (word) {
+                        if (!segmenting) {
+                            return;
+                        }
+                        progressCallback(progress++, total);
+                        deploySegmentation(word, segmentWord([], word));
+                        if (progress + 1 == total) {
+                            segmenting = false;
+                            segmentationTimeouts = [];
+                            doneCallback(_text);
+                        }
+                    }, 1, word));
+                }
+            };
+
             window.drawNetwork = () => {
                 if (!results.network || drawingNetworkNow) {
                     return;
@@ -214,10 +362,6 @@
                             face: 'Roboto, "Segoe UI", Helvetica, Arial, sans-serif'
                         }
                     },
-                    // interaction: {
-                    //     selectable: false,
-                    //     hover: false
-                    // },
                     groups: {
                         leftMarginal: {
                             color: '#CAEFC2'
@@ -380,7 +524,7 @@
                 $('.neologisms').html(neologisms.join(', '));
                 var percentage = results.score * 100;
                 var d = new Date;
-                $('.success-rate').text(percentage.toFixed(2).replace('.', ','));
+                $('.success-rate').text(percentage.toFixed(2));
                 if (isNaN(percentage)) {
                     $('.morphotactics').hide();
                 }
@@ -402,6 +546,7 @@
             ].join(':');
 
             var run = (text) => {
+                window.text = text;
                 window.parameters = {};
                 $('.parameters-section input').each(function () {
                     parameters[$(this).data('key')] = parseFloat($(this).val());
@@ -510,15 +655,8 @@
                 });
             };
 
-            $('.texts a').click(function () {
-                if ($(this).data('src').endsWith('.json')) {
-                    $.getJSON($(this).data('src'), (data) => {
-                        window.results = data;
-                        showResults();
-                    });
-                } else {
-                    $.get($(this).data('src'), run);
-                }
+            $('#language a').click(function () {
+                $.get($(this).data('src'), run);
                 return false;
             });
 
@@ -536,15 +674,38 @@
                 }
             });
 
-            $('.download-segments a').click(function() {
-                var element = document.createElement('a');
-                var blob = new Blob([results.segment[1]], {type: 'text/plain'});
-                element.setAttribute('href', URL.createObjectURL(blob));
-                element.setAttribute('download', 'segments-' + (new Date).toISOString().replace(/[^\d]/g, '') + '.txt');
-                element.style.display = 'none';
-                document.body.appendChild(element);
-                element.click();
-                document.body.removeChild(element);
+            $('#segment').click(function() {
+                if (segmenting) {
+                    return false;
+                }
+                $('#pause').trigger('click');
+                $('#segmentation-dialog').dialog({width: 500, height: 100, beforeClose: function () {
+                    for (var timeout of segmentationTimeouts) {
+                        clearTimeout(timeout);
+                    }
+                    segmentationTimeouts = [];
+                    segmenting = false;
+                    $('#resume').trigger('click');
+                }});
+                $('#segmentation-download-button').hide();
+                $('#segmentation-progress-bar').progressbar({value: 0}).show();
+                window.setTimeout(function () {
+                    var segmentation = segment((progress, total) => $('#segmentation-progress-bar').progressbar({value: Math.floor(100 * progress / total)}), function (segmentation) {
+                        $('#segmentation-progress-bar').hide();
+                        $('#segmentation-download-button').click(function () {
+                            var element = document.createElement('a');
+                            var blob = new Blob([segmentation], {type: 'text/plain'});
+                            element.setAttribute('href', URL.createObjectURL(blob));
+                            element.setAttribute('download', 'segmented-input-' + (new Date).toISOString().replace(/[^\d]/g, '') + '.txt');
+                            element.style.display = 'none';
+                            document.body.appendChild(element);
+                            element.click();
+                            document.body.removeChild(element);
+                            $('#resume').trigger('click');
+                            return false;
+                        }).show();
+                    });
+                }, 100);
                 return false;
             });
 
@@ -583,7 +744,7 @@
                     x: timeSeries.map((t) => t.time),
                     y: timeSeries.map((t) => t.score)
                 }]);
-                $('#plot-dialog').dialog({width: 600, height: 400});
+                $('#plot-dialog').dialog({width: 625, height: 400});
                 return false;
             });
 
@@ -595,130 +756,77 @@
                     return w;
                 });
                 inventions.sort();
-                $('#invention-dialog').html(inventions.join(', ')).dialog({width: 400, height: 300});
+                $('#invention-dialog').html(inventions.join(', ')).dialog({width: 400, height: 400});
                 return false;
             });
+
+            $(document).tooltip();
         });
     </script>
 </head>
 <body>
     <header>
-        <h1>Savarankiška (<em>unsupervised</em>) <abbr title="šaknų, priesagų, priešdėlių, galūnių">morfemų</abbr> paieška tekste</h1>
-        <p>&copy; 2018 Ignas Rudaitis</p>
+        <h1>Unsupervised morphology induction using novel word prediction</h1>
+        <p>&copy; 2018 Ignas Rudaitis, Vilnius University</p>
     </header>
     <section class="texts-section">
-        <h2>Pasirinkite tekstą</h2>
-        <p>Numatytieji tekstai imami iš <a href="https://www.gutenberg.org/"><em>Project Gutenberg</em></a> ir <a href="http://www.antologija.lt/"><em>Antologija.lt</em></a>.</p>
+        <h2>Input</h2>
         <dl>
-            <dt>Atidaryti failą</dt>
+            <dt>Open a local file:</dt>
             <dd>
                 <p><input id="upload" type="file"></p>
-                <p><em>Pastabos.</em> Failas iš vietinio įrenginio niekur nesiunčiamas. Priimami tik grynojo teksto (.txt) failai bei šios programos išsaugotų rezultatų failai.</p>
+                <p><em>Notes:</em> The file will not be uploaded anywhere; all processing takes place in the browser. Only plain text files (.txt) are accepted.</p>
             </dd>
 
-            <dt>Anglų kalba</dt>
-            <dd>
-                <ul class="texts">
-                    <li><a href="#" data-src="pg730.txt">Charles Dickens. <em>Oliver Twist</em></a></li>
-                </ul>
+            <dt>Use a corpus from the <a href="http://wortschatz.uni-leipzig.de/en/download">Leipzig Corpora Collection</a> (100K sentences each)</dt>
+            <dd id="language">
+                <a href="#" data-src="eng_news_2016_100K-sentences.txt">English</a>
+                <a href="#" data-src="est_news_2014_100K-sentences.txt">Estonian</a>
+                <a href="#" data-src="fra_news_2010_100K-sentences.txt">French</a>
+                <a href="#" data-src="kat_wikipedia_2016_100K-sentences.txt">Georgian</a>
+                <a href="#" data-src="deu_news_2015_100K-sentences.txt">German</a>
+                <a href="#" data-src="ell_news_2011_100K-sentences.txt">Greek</a>
+                <a href="#" data-src="lat_wikipedia_2016_100K-sentences.txt">Latin</a>
+                <a href="#" data-src="lav_newscrawl_2016_100K-sentences.txt">Latvian</a>
+                <a href="#" data-src="lit-lit_news_2015_100K-sentences.txt">Lithuanian</a>
+                <a href="#" data-src="pol_news_2008_100K-sentences.txt">Polish</a>
+                <a href="#" data-src="ron_news_2015_100K-sentences.txt">Romanian</a>
+                <a href="#" data-src="rus_news_2010_100K-sentences.txt">Russian</a>
+                <a href="#" data-src="por_wikipedia_2016_100K-sentences.txt">Portuguese</a>
+                <a href="#" data-src="swa_wikipedia_2016_100K-sentences.txt">Swahili</a>
+                <a href="#" data-src="swe_news_2007_100K-sentences.txt">Swedish</a>
+                <a href="#" data-src="tur_news_2005_100K-sentences.txt">Turkish</a>
             </dd>
-
-            <dt>Danų kalba</dt>
-            <dd>
-                <ul class="texts">
-                    <li><a href="#" data-src="pg41956.txt">Knud Hjortø. <em>Hans Råskov</em></a></li>
-                </ul>
-            </dd>
-
-            <dt>Ispanų kalba</dt>
-            <dd>
-                <ul class="texts">
-                    <li><a href="#" data-src="54436-0.txt">Pedro Calderón de la Barca. <em>Teatro selecto, tomo 1 de 4</em></a></li>
-                </ul>
-            </dd>
-
-            <dt>Latvių kalba</dt>
-            <dd>
-                <ul class="texts">
-                    <li>
-                        <a href="#" data-src="latvian.txt">30 000 sakinių tekstynas iš naujienų straipsnių (Leipzigo universitetas)</a>
-                        <!-- <ul>
-                            <li><a href="#" data-src="results-20180518125916687.json">Gatava analizė (3,93% generavimo tikslumas)</a></li>
-                        </ul> -->
-                    </li>
-                </ul>
-            </dd>
-
-            <dt>Lietuvių kalba</dt>
-            <dd>
-                <ul class="texts">
-                    <li><a href="#" data-src="lt.txt">Vincas Mykolaitis-Putinas. <em>Altorių šešėly</em> (ištrauka)</a></li>
-                    <li>
-                        <a href="#" data-src="lithuanian.txt">100 000 sakinių tekstynas iš naujienų straipsnių (Leipzigo universitetas)</a>
-                        <!-- <ul>
-                            <li><a href="#" data-src="results-20180518174312574.json">Gatava analizė (3,69% generavimo tikslumas)</a></li>
-                        </ul> -->
-                    </li>
-                </ul>
-            </dd>
-
-            <dt>Rusų kalba</dt>
-            <dd>
-                <ul class="texts">
-                    <li><a href="#" data-src="14741-0.txt">Гавриил Романович Державин. <em>Духовные оды</em></a></li>
-                    <li>
-                        <a href="#" data-src="russian.txt">30 000 sakinių tekstynas iš naujienų straipsnių (Leipzigo universitetas)</a>
-                        <!-- <ul>
-                            <li><a href="#" data-src="results-20180518132643927.json">Gatava analizė (3,18% generavimo tikslumas)</a></li>
-                        </ul> -->
-                    </li>
-                </ul>
-            </dd>
-
-            <dt>Suomių kalba</dt>
-            <dd>
-                <ul class="texts">
-                    <li><a href="#" data-src="pg7000.txt"><em>Kalevala</em> (surinko Elias Lönnrot)</a></li>
-                </ul>
-            </dd>
-
-            <dt>Vokiečių kalba</dt>
-            <dd>
-                <ul class="texts">
-                    <li><a href="#" data-src="pg2230.txt">Johann Wolfgang von Goethe. <em>Faust: Der Tragödie zweiter Teil</em></a></li>
-                </ul>
-            </dd>
-        </dl>
     </section>
-    <section class="parameters-section">
-        <h2>Parametrai</h2>
+    <section class="parameters-section" style="display: none;">
+        <h2>Parameters</h2>
         <table>
             <!-- <tr>
                 <td>Kaimynysčių įtraukties koeficientas</td>
                 <td><input type="number" data-key="edgeThresholdFactor" value="5"></td>
             </tr> -->
             <tr>
-                <td>Įsimintinų raidžių samplaikų skaičius</td>
+                <td># of salient substrings</td>
                 <td><input data-key="numSalientSubstrings" type="number" value="3000"></td>
             </tr>
             <tr>
-                <td>Idealus įsimintinos samplaikos ilgis</td>
+                <td>Preferred length of an affix</td>
                 <td><input data-key="preferredMorphemeLength" type="number" value="3"></td>
             </tr>
             <tr>
-                <td>Minimalus komutaciją įrodančių žodžių skaičius</td>
+                <td>Minimum # of examples to prove a commutation</td>
                 <td><input data-key="minCommutationStrength" type="number" value="100"></td>
             </tr>
             <tr>
-                <td>Maksimalus komutacijų skaičius iki tikslinimo</td>
+                <td>Maximum # of commutations before refinement</td>
                 <td><input data-key="maxNumPrimaryCommutations" type="number" value="3000"></td>
             </tr>
             <tr>
-                <td>Maksimalus aktualių morfemų skaičius</td>
+                <td>Maximum # of morphemes to consider</td>
                 <td><input data-key="pruningThreshold" type="number" value="2000"></td>
             </tr>
-            <tr>
-                <td>Apmokymui ir validavimui skirto teksto proporcija</td>
+            <tr style="display: none;">
+                <td>Relative size of training/validation sets</td>
                 <td><input data-key="trainingSetProportion1" value="1" type="number" style="width: 4em;"> : <input data-key="trainingSetProportion2" value="1" type="number" style="width: 4em;"></td>
             </tr>
             <!-- <tr>
@@ -726,7 +834,7 @@
                 <td><input data-key="numClusteringOperations" type="number" value="300"></td>
             </tr> -->
             <tr>
-                <td>Preciziškumo, atgaminimo ir MDL santykinė svarba</td>
+                <td>Relative weights of precision, recall and MDL scores</td>
                 <td><input data-key="precisionMultiplier" type="number" value="50" style="width: 3em;"> : <input data-key="recallMultiplier" type="number" value="50" style="width: 3em;"> : <input data-key="MDLMultiplier" type="number" value="2" style="width: 3em;"></td>
             </tr>
             <!-- <tr>
@@ -740,22 +848,21 @@
         </table>
     </section>
     <section class="progress-section">
-        <h2>Eiga</h2>
+        <h2>Progress</h2>
         <ul class="tasks">
-            <li data-task="extractWords">Išrinkti žodžius</li>
-            <li data-task="makePrefixTree">Sudaryti duomenų struktūrą apmokymui skirtų žodžių paieškai (<span class="progress">0</span>%)</li>
-            <li data-task="makeValidationPrefixTree">Sudaryti duomenų struktūrą vertinimui skirtų žodžių paieškai (<span class="progress">0</span>%)</li>
-            <li data-task="getSalientSubstrings">Rasti dažnai pasikartojančias raidžių samplaikas</li>
-            <li data-task="commute">Atlikti komutacijų testus (<span class="progress">0</span>%)</li>
-            <li data-task="refineCommutations">Patikslinti komutacijų testų rezultatus (<span class="progress">0</span>%)</li>
-            <li data-task="getBigrams">Sužymėti galimų morfemų kaimynystę</li>
-            <li data-task="getMorphemes">Paskelbti kandidatines morfemas</li>
-            <li data-task="getAdjacencyMatrix">Sudaryti kaimynystės matricą (<span class="progress">0</span>%)</li>
-            <li data-task="restoreStateFromCache">Atkurti ankstesnės analizės rezultatus (<span class="progress">0</span>%)</li>
+            <li data-task="extractWords">Extract words</li>
+            <li data-task="makePrefixTree">Build a prefix tree for training words (<span class="progress">0</span>%)</li>
+            <li data-task="makeValidationPrefixTree">Build a prefix tree for validation words (<span class="progress">0</span>%)</li>
+            <li data-task="getSalientSubstrings">Detect salient substrings</li>
+            <li data-task="commute">Perform commutation tests (<span class="progress">0</span>%)</li>
+            <li data-task="refineCommutations">Refine commutations (<span class="progress">0</span>%)</li>
+            <li data-task="getBigrams">Count bigrams of commuting substrings</li>
+            <li data-task="getAdjacencyMatrix">Compose an adjacency list (<span class="progress">0</span>%)</li>
+            <li data-task="restoreStateFromCache">Resume previous progress (<span class="progress">0</span>%)</li>
             <!--<li data-task="doFirstPassClustering">Sugrupuoti morfemas pagal kaimynystės savybes</li>-->
             <!-- <li data-task="generateLayout">Išdėstyti kaimynystės schemą plokštumoje (<span class="progress">0</span>%)</li>
             <li data-task="getRelevantEdges">Išrinkti rodykles iš kaimynystės matricos (<span class="progress">0</span>%)</li> -->
-            <li data-task="doSecondPassClustering">Sugrupuoti morfemas pagal kaimynystės savybes (<span class="progress">0</span>%)</li>
+            <li data-task="doSecondPassClustering">Cluster candidate morphemes (<span class="progress">0</span>%)</li>
             <!--<li class="iteration" data-counter="i">
                 <strong>{i} bandymas grupuoti kandidatines morfemas:</strong>
                 <ul>
@@ -781,25 +888,30 @@
             Naujadarų generavimas nedavė rezultatų. Gali reikėti pasirinkti ilgesnį tekstą arba tiesiog paleisti algoritmą dar kartą.
         </div> -->
         <div class="network">
-            <p class="wait">Prašome palaukti, ruošiamas morfotaktinio tinklo vaizdas...</p>
+            <p class="wait">Please wait, the morphotactic graph is loading...</p>
         </div>
         <div class="status">
-            <span class="success-rate">0</span>% tikslumas
-            <span class="update-network" style="display: none;"> &bull; <a href="#">Atnaujinti vaizdą</a></span>
+            Score: <span class="success-rate">0</span>%
+            <span class="update-network" style="display: none;"> &bull; <a href="#">Refresh graph</a></span>
         </div>
         <div class="actions">
-            <a id="plot" href="#" title="Įverčio kitimas laike"><i class="material-icons">insert_chart</i></a>
-            <a id="invent" href="#" title="Prognozuojami žodžiai"><i class="material-icons">star</i></a>
-            <a id="pause" href="#" title="Pristabdyti"><i class="material-icons">pause</i></a>
-            <a id="resume" style="display: none;" href="#" title="Tęsti"><i class="material-icons">play_arrow</i></a>
+            <a id="segment" href="#" title="Get segmented text"><i class="material-icons">line_style</i></a>
+            <a id="plot" href="#" title="Score over time"><i class="material-icons">insert_chart</i></a>
+            <a id="invent" href="#" title="Word predictions"><i class="material-icons">star</i></a>
+            <a id="pause" href="#" title="Pause"><i class="material-icons">pause</i></a>
+            <a id="resume" style="display: none;" href="#" title="Resume"><i class="material-icons">play_arrow</i></a>
         </div>
         <div class="network-in-preparation"></div>
     </section>
-    <div id="plot-dialog" style="display: none;" title="Įverčio kitimas laike">
+    <div id="plot-dialog" style="display: none;" title="Score over time">
         <div id="time-series">
         </div>
     </div>
-    <div id="invention-dialog" style="display: none;" title="Prognozuojami žodžiai">
+    <div id="invention-dialog" style="display: none;" title="Word predictions">
+    </div>
+    <div id="segmentation-dialog" style="display: none;" title="Segmenting the input...">
+        <button id="segmentation-download-button">Download (.txt)</button>
+        <div id="segmentation-progress-bar"></div>
     </div>
 </body>
 </html>

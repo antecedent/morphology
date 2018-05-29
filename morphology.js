@@ -599,6 +599,8 @@ Morphology = {
     splitMorphemes: (info) => {
         var id = 3;
 
+        var originalInfo = info;
+
         var info = Morphology.copyClusterInfo(info);
 
         for (var cluster of info) {
@@ -734,6 +736,12 @@ Morphology = {
                 result = result.slice(0, resultLength);
             }
             resultLength = result.length;
+        }
+
+        if (resultLength <= 3) {
+            console.log('The splitting procedure produced too many morphemes. Doubling the pruning threshold.');
+            Morphology.pruningThreshold *= 2;
+            return Morphology.splitMorphemes(originalInfo);
         }
 
         for (var cluster of result) {
@@ -898,12 +906,17 @@ Morphology = {
         };
 
         var numClusters = new Set(info.map((i) => i.id)).size;
+        var initialNumClusters = numClusters;
 
         var total = Math.max(numClusters - Morphology.maxNumClusters, Morphology.numReclusteringIterations);
         trialLoop:
         for (var iteration = 0; iteration < Morphology.numReclusteringIterations || numClusters > Morphology.maxNumClusters; iteration++) {
             if (progressCallback) {
-                progressCallback(Math.min(iteration, total), total);
+                if (initialNumClusters > Morphology.maxNumClusters) {
+                    progressCallback(initialNumClusters - numClusters, initialNumClusters - Morphology.maxNumClusters);
+                } else {
+                    progressCallback(Math.min(iteration, total), total);
+                }
             }
             var candidate = Array.from(output);
             if (affixCascade.length == 0) {
@@ -1363,45 +1376,6 @@ Morphology = {
         result = Array.from(result);
         result.sort();
         return result;
-    },
-
-    segment: (text, words, clusters, clusterInfo, morphemeMapping, progressCallback) => {
-        var run = (suffix, state) => {
-            if (suffix == '') {
-                return [];
-            }
-            for (var i = 1; i <= suffix.length; i++) {
-                var substring = suffix.substring(0, i);
-                if (morphemeMapping.hasOwnProperty(substring)) {
-                    var next = clusters[morphemeMapping[substring]];
-                    if (state.successors.has(clusterInfo[next]) && !clusterInfo[next].disabled) {
-                        var subResult = run(suffix.substring(substring.length), clusterInfo[next]);
-                        if (subResult !== null) {
-                            return [substring].concat(subResult);
-                        }
-                    }
-                }
-            }
-            return null;
-        };
-        var result = {};
-        var k = 0;
-        text = text.replace(/-/g, ' ');
-        for (var word of words) {
-            progressCallback(k++, words.size);
-            result[word] = run(word.substring(1), clusterInfo[clusters[morphemeMapping['⋊']]]);
-            if (result[word] !== null) {
-                result[word] = result[word].slice(0, -1);
-            }
-            try {
-                if (result[word] !== null && result[word].length > 1) {
-                    text = text.replace(new RegExp('([^\\w\']|^)(' + word.substring(1, word.length - 1) + ')([^\\w\']|$)', 'ig'), '$1' + result[word].join('-') + '$3');
-                }
-            } catch (error) {
-                // Ignore regex errors
-            }
-        }
-        return [result, text];
     },
 
     makePrefixTree: (words, progressCallback, prefixesOnly) => {
