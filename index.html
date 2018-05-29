@@ -603,11 +603,11 @@
                         if (e.data.task == 'network') {
                             if (window.networkInterval === null) {
                                 drawNetwork();
-                                window.networkInterval = window.setInterval(drawNetwork, 10000);
+                                window.networkInterval = window.setInterval(drawNetwork, 300000);
                             }
                         }
                         if (e.data.task == 'initialized') {
-                            window.setTimeout(() => worker.postMessage({action: 'run'}), 10);
+                            window.setTimeout(() => worker.postMessage({action: 'run'}), 1);
                         }
                         if (e.data.task == 'ready') {
                             readyToRender = true;
@@ -615,7 +615,7 @@
                             $('header').hide();
                             showResults();
                             if (!paused) {
-                                window.setTimeout(() => worker.postMessage({action: 'run'}), 10);
+                                window.setTimeout(() => worker.postMessage({action: 'run'}), 1);
                             }
                         }
                         if (e.data.task == 'beginPayload') {
@@ -824,7 +824,7 @@
             </tr>
             <tr>
                 <td>Maximum # of morphemes to consider</td>
-                <td><input data-key="pruningThreshold" type="number" value="10000"></td>
+                <td><input data-key="pruningThreshold" type="number" value="5000"></td>
             </tr>
             <tr style="display: none;">
                 <td>Relative size of training/validation sets</td>

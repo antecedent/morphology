@@ -23,7 +23,8 @@ Morphology = {
     MDLMultiplier: 1,
     numReclusteringIterations: 10,
     MDLUpperBound: 300,
-    maxNumClusters: 1000,
+    maxNumClusters: 750,
+    subscripts: /[₀₁₂₃₄₅₆₇₈₉]/g,
 
     product: function* (iterable, n) {
         if (n > 0) {
@@ -584,18 +585,6 @@ Morphology = {
         return result;
     },
 
-    removeSubscripts: (word) => {
-        var result = [];
-        var chars = ['₀', '₁', '₂',	'₃', '₄', '₅', '₆', '₇', '₈', '₉'];
-        for (var i = 0; i < word.length; i++) {
-            if (chars.includes(word[i])) {
-                continue;
-            }
-            result.push(word[i]);
-        }
-        return result.join('');
-    },
-
     splitMorphemes: (info) => {
         var id = 3;
 
@@ -930,7 +919,7 @@ Morphology = {
         var equivalent = (c1, c2) => {
             for (var m1 of c1.morphemes) {
                 for (var m2 of c2.morphemes) {
-                    if (m1 != m2 && Morphology.removeSubscripts(m1) == Morphology.removeSubscripts(m2)) {
+                    if (m1 != m2 && m1.replace(Morphology.subscripts, '') == m2.replace(Morphology.subcscripts, '')) {
                         return true;
                     }
                 }
@@ -1230,10 +1219,10 @@ Morphology = {
             }
             var morphemesWithoutSubscripts = new Set;
             for (var morpheme of first.morphemes) {
-                morphemesWithoutSubscripts.add(Morphology.removeSubscripts(morpheme));
+                morphemesWithoutSubscripts.add(morpheme.replace(Morphology.subscripts, ''));
             }
             for (var morpheme of new Set(second.morphemes)) {
-                if (!morphemesWithoutSubscripts.has(Morphology.removeSubscripts(morpheme))) {
+                if (!morphemesWithoutSubscripts.has(morpheme.replace(Morphology.subscripts, ''))) {
                     first.morphemes.push(morpheme);
                 }
             }
@@ -1346,7 +1335,7 @@ Morphology = {
                 cluster.numEndingPaths += Math.max(predecessor.numEndingPaths, 1) * cluster.morphemes.length;
                 for (var explanation of predecessor.explanations) {
                     for (var morpheme of cluster.morphemes) {
-                        morpheme = Morphology.removeSubscripts(morpheme);
+                        morpheme = morpheme.replace(Morphology.subscripts, '');
                         if (Morphology.searchPrefixTree(validationPrefixTree, explanation + morpheme).length > 0) {
                             cluster.explanations.add(explanation + morpheme);
                         }
@@ -1380,7 +1369,7 @@ Morphology = {
                         continue;
                     }
                     for (var m of next.morphemes) {
-                        for (var sub of invent(next, w + Morphology.removeSubscripts(m), n - 1)) {
+                        for (var sub of invent(next, w + m.replace(Morphology.subscripts, ''), n - 1)) {
                             yield sub;
                         }
                     }
@@ -1451,7 +1440,7 @@ Morphology = {
     network: (info) => {
         var label = (cluster) => {
             var max = 15;
-            var result = Morphology.shuffle(cluster.morphemes)[0].slice(0, max).map(Morphology.removeSubscripts).join(', ');
+            var result = Morphology.shuffle(cluster.morphemes)[0].slice(0, max).map(m => m.replace(Morphology.subscripts, '')).join(', ');
             if (cluster.morphemes.length > max) {
                 result += ', ...';
             }
