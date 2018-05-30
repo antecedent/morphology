@@ -42,10 +42,13 @@ var task = (name, callback) => {
 
 var sendImages = false;
 
+var shouldSplit = false;
+
 var initialize = (e) => {
     for (var key of Object.keys(e.data.parameters)) {
         Morphology[key] = e.data.parameters[key];
     }
+    shouldSplit = e.data.parameters.shouldSplit;
     preliminaryWords = e.data.text.split(/\s+/);
     Morphology.trainingSetProportion = Morphology.trainingSetProportion1 / Morphology.trainingSetProportion2;
     // NB the hardcoded value below
@@ -53,6 +56,10 @@ var initialize = (e) => {
     trainingSet = preliminaryWords.slice(0, trainingSetPivot).join(' ');
     validationSet = preliminaryWords.slice(trainingSetPivot).join(' ');
     words = task('extractWords', () => Morphology.extractWords(trainingSet));
+    trainingArray = Array.from(words);
+    trainingArray.sort();
+    reverseTrainingArray = Array.from(words).map(w => w.split('').reverse().join(''));
+    reverseTrainingArray.sort();
     validationWords = Morphology.extractWords(validationSet);
     for (var word of Array.from(validationWords)) {
         if (words.has(word)) {
@@ -62,7 +69,7 @@ var initialize = (e) => {
     task('getValidationSet', () => validationWords);
     wordsWithBoundaries = task('addBoundaryChars', () => Morphology.addBoundaryChars(words));
     [prefixTree, wordArray] = task('makePrefixTree', () => Morphology.makePrefixTree(wordsWithBoundaries, progress('makePrefixTree')));
-    [validationPrefixTree, _discard] = task('makeValidationPrefixTree', () => Morphology.makePrefixTree(Array.from(validationWords).map((w) => '⋊' + w + '⋉'), progress('makeValidationPrefixTree'), true));
+    //[validationPrefixTree, _discard] = task('makeValidationPrefixTree', () => Morphology.makePrefixTree(Array.from(validationWords).map((w) => '⋊' + w + '⋉'), progress('makeValidationPrefixTree'), true));
     substrings = task('getSalientSubstrings', () => Morphology.getSalientSubstrings(wordsWithBoundaries));
     preliminaryWords = [];
     commutations = task('commute', () => Morphology.commute(substrings, wordsWithBoundaries, prefixTree, wordArray, progress('commute')));
@@ -77,14 +84,20 @@ var initialize = (e) => {
         morphemeMapping
     ));
     info = Morphology.getClusterInfo(null, firstPassClusters, adjacencyList, morphemeMapping, commutations);
-    [info, firstPassClusters, adjacencyList, morphemeMapping] = Morphology.splitMorphemes(info);
+    if (shouldSplit) {
+        [info, firstPassClusters, adjacencyList, morphemeMapping] = Morphology.splitMorphemes(info, {
+            trainingArray: trainingArray,
+            reverseTrainingArray: reverseTrainingArray
+        });
+    }
     numFirstPassClusters = new Set(firstPassClusters).size;
     Morphology.MDLUpperBound = Math.min(numFirstPassClusters, Morphology.maxNumClusters);
     task('getAdjacencyMatrix', () => [null, morphemeMapping]);
     //console.log(JSON.stringify(firstPassClusters));
     dependencies.adjacencyList = adjacencyList;
     dependencies.morphemeMapping = morphemeMapping;
-    dependencies.validationPrefixTree = validationPrefixTree;
+    dependencies.validationArray = Array.from(Morphology.addBoundaryChars(validationWords));
+    dependencies.validationArray.sort();
     dependencies.numValidationWords = validationWords.size;
     dependencies.trainingWords = words;
 
@@ -102,7 +115,7 @@ var initialize = (e) => {
                         reclusterings.push(Morphology.reenactReclusteringHistory(clustering.history, firstPassClusters, info, dependencies));
                     } catch (error) {
                         reclusterings = [initialClustering];
-                        debugger;
+                        break;
                     }
                 }
             } catch (error) {
@@ -139,7 +152,7 @@ onmessage = (e) => {
 var run = () => {
     if (reclusterings.length > numReclusteringsToKeep) {
         var reclusteringsBackup = Morphology.shuffle(reclusterings)[0];
-        reclusterings = [initialClustering];
+        reclusterings = [];
         var max = reclusteringsBackup.reduce((a, x) => Math.max(x.score, a), 0);
         var min = reclusteringsBackup.reduce((a, x) => Math.min(x.score, a), Infinity);
         var bucketSize = (max - min) / numBuckets;
@@ -165,10 +178,16 @@ var run = () => {
     pick = Math.floor(span * Math.random());
     clusters = Array.from(reclusterings[pick].clusters);
     info = Morphology.copyClusterInfo(reclusterings[pick].info);
-    reclustering = task('doSecondPassClustering', () => Morphology.recluster(info, Array.from(clusters), reclusterings[pick].history, dependencies, firstReclustering ? progress('doSecondPassClustering') : null));
+    reclustering = Morphology.recluster(info, Array.from(clusters), reclusterings[pick].history, dependencies, firstReclustering ? progress('doSecondPassClustering') : null);
+    console.log(reclustering.score);
     //info = Morphology.copyClusterInfo(reclustering.info);
-    reclusterings.push(reclustering);
-    if (reclustering.score - highScore < Morphology.minGain) {
+    if (!shouldSplit && reclusterings.length === 1 && reclusterings[0] === initialClustering) {
+        reclusterings = [];
+    }
+    if (reclustering.score > 0) {
+        reclusterings.push(reclustering);
+    }
+    if (reclustering.score < highScore) {
         task('ready', () => null);
         return;
     }

@@ -204,10 +204,6 @@
 
             window.paused = false;
 
-            window.setInterval(() => {
-                showResults();
-            }, 10000);
-
             window.networksDrawn = new Set;
             window.drawingNetworkNow = false;
 
@@ -536,8 +532,8 @@
 
             var hash = (text) => [
                 text.length,
-                text.substring(0, 1000).replace(/:/g, ''),
-                text.substring(text.length - 1000, text.length).replace(/:/g, ''),
+                text.substring(0, 100).replace(/:/g, ''),
+                text.substring(text.length - 100, text.length).replace(/:/g, ''),
                 parameters.numSalientSubstrings,
                 parameters.preferredMorphemeLength,
                 parameters.minCommutationStrength,
@@ -556,12 +552,13 @@
                     if (isNaN(parameters[$(this).data('key')])) {
                         return;
                     }
+                    parameters.shouldSplit = $('#splitting-on').is(':checked');
                 });
                 var textKey = hash(text);
                 if (localStorage.getItem(textKey)) {
                     parameters.commutations = JSON.parse(localStorage.getItem(textKey));
                 }
-                var clusteringsKey = [textKey, 'clusterings', parameters.precisionMultiplier, parameters.recallMultiplier, parameters.MDLMultiplier].join(':');
+                var clusteringsKey = [textKey, 'clusterings', parameters.precisionMultiplier, parameters.recallMultiplier, parameters.MDLMultiplier, parameters.shouldSplit].join(':');
                 if (localStorage.getItem(clusteringsKey)) {
                     parameters.clusterings = JSON.parse(localStorage.getItem(clusteringsKey));
                 }
@@ -594,7 +591,7 @@
                         }
                         if (e.data.task == 'getClusterings') {
                             try {
-                                localStorage.setItem([textKey, 'clusterings', parameters.precisionMultiplier, parameters.recallMultiplier, parameters.MDLMultiplier].join(':'), JSON.stringify(e.data.result));
+                                localStorage.setItem([textKey, 'clusterings', parameters.precisionMultiplier, parameters.recallMultiplier, parameters.MDLMultiplier, parameters.shouldSplit].join(':'), JSON.stringify(e.data.result));
                             } catch (error) {
                                 console.log('Local storage quota exceeded.');
                                 //localStorage.clear();
@@ -737,13 +734,16 @@
                 return false;
             });
 
-            $('#plot').click(function() {
+            window.setInterval(() => {
                 Plotly.newPlot('time-series', [{
                     type: 'scatter',
                     mode: 'lines',
                     x: timeSeries.map((t) => t.time),
                     y: timeSeries.map((t) => t.score)
                 }]);
+            }, 10000);
+
+            $('#plot').click(function() {
                 $('#plot-dialog').dialog({width: 625, height: 400});
                 return false;
             });
@@ -771,6 +771,7 @@
     </header>
     <section class="texts-section">
         <h2>Input</h2>
+        <p><input id="splitting-on" checked type="checkbox"> Mitigate the conflation of homonymous affixes (highly multiplies the number of inital clusters, which triggers pruning)</p>
         <dl>
             <dt>Open a local file:</dt>
             <dd>
@@ -824,7 +825,7 @@
             </tr>
             <tr>
                 <td>Maximum # of morphemes to consider</td>
-                <td><input data-key="pruningThreshold" type="number" value="5000"></td>
+                <td><input data-key="pruningThreshold" type="number" value="2000"></td>
             </tr>
             <tr style="display: none;">
                 <td>Relative size of training/validation sets</td>
@@ -853,7 +854,6 @@
         <ul class="tasks">
             <li data-task="extractWords">Extract words</li>
             <li data-task="makePrefixTree">Build a prefix tree for training words (<span class="progress">0</span>%)</li>
-            <li data-task="makeValidationPrefixTree">Build a prefix tree for validation words (<span class="progress">0</span>%)</li>
             <li data-task="getSalientSubstrings">Detect salient substrings</li>
             <li data-task="commute">Perform commutation tests (<span class="progress">0</span>%)</li>
             <li data-task="refineCommutations">Refine commutations (<span class="progress">0</span>%)</li>

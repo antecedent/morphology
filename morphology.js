@@ -11,19 +11,14 @@ Morphology = {
     successorThresholdFactor: 8,
     commutationAnomalyFactor: 3,
     maxNumPrimaryCommutations: 3000,
-    clusteringIntensity: 100,
-    numSecondPassClusteringOuterIterations: 1,
-    minGain: 0.0001,
     commutations: [],
-    checkSubsets: false,
-    phonotacticPenalty: 50,
-    numClusteringOperations: 10000,
     precisionMultiplier: 1,
     recallMultiplier: 1,
     MDLMultiplier: 1,
-    numReclusteringIterations: 10,
+    numReclusteringIterations: 1,
     MDLUpperBound: 300,
-    maxNumClusters: 750,
+    maxNumClusters: 500,
+    maxNumEdges: 1000,
     subscripts: /[₀₁₂₃₄₅₆₇₈₉]/g,
 
     product: function* (iterable, n) {
@@ -541,12 +536,17 @@ Morphology = {
 
         var signatures = {};
 
+        var numEdges = 0;
+
         for (var root of roots) {
             var signature = [];
             var i = morphemeMapping[root];
             for (var affix of affixes) {
                 var j = morphemeMapping[affix];
-                signature.push(adjacencyMatrix[i][j]);
+                if (adjacencyMatrix[i][j] || adjacencyMatrix[j][i]) {
+                    numEdges++;
+                }
+                signature.push(adjacencyMatrix[i][j] || adjacencyMatrix[j][i]);
             }
             var key = signature.join('');
             if (!signatures.hasOwnProperty(key)) {
@@ -555,13 +555,22 @@ Morphology = {
             signatures[key].push(root);
         }
 
-        for (var signature of Object.keys(signatures)) {
+        var signatureKeys = Object.keys(signatures);
+        signatureKeys.sort((l, r) => signatures[r].length - signatures[l].length);
+
+        var numEdges = 0;
+
+        for (var signature of signatureKeys) {
+            numEdges += signature.split('1').length - 1;
             morphemeListByCluster[numClusters] = signatures[signature];
             for (var root of signatures[signature]) {
                 clusterByMorphemeId[morphemeMapping[root]] = numClusters;
             }
             signatureByCluster[numClusters] = signature;
             numClusters++;
+            if (numEdges > Morphology.maxNumEdges) {
+                break;
+            }
         }
 
         var result = [];
@@ -585,7 +594,7 @@ Morphology = {
         return result;
     },
 
-    splitMorphemes: (info) => {
+    splitMorphemes: (info, dependencies) => {
         var id = 3;
 
         var originalInfo = info;
@@ -645,6 +654,32 @@ Morphology = {
             //console.log(JSON.stringify(path));
             var last = path.length == 0 ? root : path[path.length - 1].cluster;
             if (last.boundary) {
+
+                var spurious = true;
+                var relation = path[path.length - 1].relation;
+                if (relation == 'predecessors') {
+                    var prefix = Array.from(path).reverse().slice(1).filter(s => s.cluster.affix).map(s => s.cluster.morphemes[0]).join('');
+                    for (var m of root.morphemes) {
+                        if (Morphology.searchPrefix(prefix + m, dependencies.trainingArray)) {
+                            spurious = false;
+                            break;
+                        }
+                    }
+                }
+                if (relation == 'successors') {
+                    var suffix = Array.from(path).reverse().slice(1).filter(s => s.cluster.affix).map(s => s.cluster.morphemes[0]).join('');
+                    for (var m of root.morphemes) {
+                        if (Morphology.searchPrefix((m + suffix).split('').reverse().join(''), dependencies.reverseTrainingArray)) {
+                            spurious = false;
+                            break;
+                        }
+                    }
+                }
+
+                if (spurious) {
+                    return;
+                }
+
                 if (path.length == 1) {
                     return;
                 }
@@ -686,9 +721,6 @@ Morphology = {
                     if (new Set(path.concat({relation: relation}).map((p) => p.relation)).size > 1) {
                         continue;
                     }
-                    if (numMorphemes > Morphology.pruningThreshold) {
-                        return;
-                    }
                     split(root, rootCopy, path.concat([{cluster: next, relation: relation}]));
                 }
             }
@@ -701,6 +733,10 @@ Morphology = {
         var resultLength = result.length;
 
         var numRootsProcessed = 0;
+
+        var numAffixes = originalInfo.filter(i => i.affix).length;
+        var numRoots = originalInfo.filter(i => !i.affix).length;
+        var affixToRootRatio = numAffixes / numRoots;
 
         for (var root of roots) {
             var lastIdBackup = id;
@@ -733,43 +769,11 @@ Morphology = {
             resultLength = result.length;
         }
 
-        var toRenumber = [];
-        var visited = new Set;
-
-        var enqueueForRenumbering = (cluster) => {
-            visited.add(cluster.id);
-            for (var relation of ['successors', 'predecessors']) {
-                for (var neighbor of cluster[relation]) {
-                    if (!visited.has(neighbor.id)) {
-                        enqueueForRenumbering(neighbor);
-                        visited.add(neighbor.id);
-                    }
-                }
-            }
-        };
-
-        for (var cluster of roots.slice(resultLength)) {
-            enqueueForRenumbering(cluster);
-        }
-
-        for (var cluster of toRenumber) {
-            if (neighboredWithFinal.has(cluster.id)) {
-                cluster.successors.add(final);
-                final.predecessors.add(cluster);
-            }
-            if (neighboredWithInitial.has(cluster.id)) {
-                cluster.predecessors.add(initial);
-                initial.successors.add(cluster);
-            }
-            cluster.id = id++;
-            result.push(cluster);
-        }
-
         for (var cluster of result) {
-            for (var successor of cluster.successors) {
+            for (var successor of new Set(cluster.successors)) {
                 successor.predecessors.add(cluster);
             }
-            for (var predecessor of cluster.predecessors) {
+            for (var predecessor of new Set(cluster.predecessors)) {
                 predecessor.successors.add(cluster);
             }
         }
@@ -780,7 +784,9 @@ Morphology = {
 
         for (var i = 0; i < result.length; i++) {
             for (var m of result[i].morphemes) {
-                morphemes[m] = k++;
+                if (!morphemes.hasOwnProperty(m)) {
+                    morphemes[m] = k++;
+                }
             }
         }
 
@@ -828,9 +834,9 @@ Morphology = {
         clusters = Array.from(clusters);
         info = Morphology.copyClusterInfo(info);
         var evaluate = () =>
-            Morphology.inventWords(dependencies.validationPrefixTree, dependencies.numValidationWords, info, null, null, dependencies.traniningWords);
+            Morphology.inventWords(dependencies.validationArray, dependencies.numValidationWords, info, null, null, dependencies.traniningWords);
         var invent = () =>
-            Morphology.getInventedWords(dependencies.numValidationWords, dependencies.validationPrefixTree, dependencies.numValidationWords, info, null, null, dependencies.trainingWords);
+            Morphology.getInventedWords(dependencies.numValidationWords, dependencies.validationArray, dependencies.numValidationWords, info, null, null, dependencies.trainingWords);
         for (var [first, second] of history) {
             var result = Morphology.mergeClusters(clusters, info, first, second);
             if (result) {
@@ -848,6 +854,9 @@ Morphology = {
 
     mergeClusters: (clusters, info, first, second) => {
         var candidate = Array.from(clusters);
+        if (!info[first] || !info[second]) {
+            debugger;
+        }
         if (first == second) {
             return false;
         }
@@ -886,12 +895,18 @@ Morphology = {
 
     recluster: (info, input, history, dependencies, progressCallback) => {
 
+        if (!dependencies.roots) {
+            dependencies.roots = Object.keys(info).filter(i => !info[i].affix);
+            dependencies.prefixes = Object.keys(info).filter(i => info[i].site == 'left' || info[i].site == 'leftMarginal');
+            dependencies.suffixes = Object.keys(info).filter(i => info[i].site == 'right' || info[i].site == 'rightMarginal');
+        }
+
         var info = Morphology.copyClusterInfo(info);
 
         var evaluate = () =>
-            Morphology.inventWords(dependencies.validationPrefixTree, dependencies.numValidationWords, info, null, null, dependencies.trainingWords);
+            Morphology.inventWords(dependencies.validationArray, dependencies.numValidationWords, info, null, null, dependencies.trainingWords);
         var invent = () =>
-            Morphology.getInventedWords(dependencies.numValidationWords, dependencies.validationPrefixTree, dependencies.numValidationWords, info, null, null, dependencies.trainingWords);
+            Morphology.getInventedWords(dependencies.numValidationWords, dependencies.validationArray, dependencies.numValidationWords, info, null, null, dependencies.trainingWords);
 
         var output = Array.from(input);
         var count = input.reduce((a, x) => Math.max(a, x), 0) + 1;
@@ -942,9 +957,17 @@ Morphology = {
             }
             var candidate = Array.from(output);
             if (affixCascade.length == 0) {
-                var [first, second] = [Math.random(), Math.random()].map((r) => Math.floor(r * count));
+                var first = Math.floor(Math.random() * count);
+                var range = dependencies.roots;
+                if (info[first].site == 'left' || info[first].site == 'leftMarginal') {
+                    range = dependencies.prefixes;
+                } else if (info[first].site == 'right' || info[first].site == 'rightMarginal') {
+                    range = dependencies.suffixes;
+                }
+                var second = range[Math.floor(Math.random() * range.length)];
             } else {
                 var [first, second] = affixCascade[0];
+                iteration--;
             }
             [first, second] = [Math.min(first, second), Math.max(first, second)];
             var infoBackup = info;
@@ -1233,6 +1256,23 @@ Morphology = {
             if (second.site == 'right') {
                 first.site = 'right';
             }
+
+            var stack = [first, second];
+            var visited = new Set;
+            while (stack.length > 0) {
+                var top = stack.pop();
+                top.intact = false;
+                top.numEndingPaths = 0;
+                top.explanations = new Set;
+                visited.add(top.id);
+                for (var successor of top.successors) {
+                    if (!visited.has(successor.id)) {
+                        stack.push(successor);
+                        visited.add(successor.id);
+                    }
+                }
+            }
+
             second = null;
             clusters[operation.second] = first;
         }
@@ -1299,33 +1339,42 @@ Morphology = {
         return result;
     },
 
-    inventWords: (validationPrefixTree, numValidationWords, clusterInfo, initial, final, words) => {
-
-        var clusterInfo = Morphology.copyClusterInfo(clusterInfo);
+    inventWords: (validationArray, numValidationWords, clusterInfo, initial, final, words) => {
 
         var initial = clusterInfo.filter((c) => c.morphemes.includes('⋊'))[0];
         var final = clusterInfo.filter((c) => c.morphemes.includes('⋉'))[0];
 
-        for (var cluster of clusterInfo) {
-            cluster.numEndingPaths = 0;
-            for (var successor of new Set(cluster.successors)) {
-                if (
-                    (successor.site == 'leftMarginal' && !cluster.morphemes.includes('⋊')) ||
-                    (successor.site == 'left' && !(cluster.affix || cluster.morphemes.includes('⋊'))) ||
-                    (!(cluster.affix || cluster.morphemes.includes('⋊')) && !(successor.affix || successor.morphemes.includes('⋉'))) ||
-                    (cluster.site == 'rightMarginal' && !successor.morphemes.includes('⋉')) ||
-                    (cluster.site == 'right' && !(successor.affix || successor.morphemes.includes('⋉')))
-                ) {
-                    cluster.successors.delete(successor);
+        if (!initial.hasUndergoneCycleDeletion) {
+            for (var cluster of clusterInfo) {
+                cluster.numEndingPaths = 0;
+                for (var successor of new Set(cluster.successors)) {
+                    if (
+                        (successor.site == 'leftMarginal' && !cluster.morphemes.includes('⋊')) ||
+                        (successor.site == 'left' && !(cluster.affix || cluster.morphemes.includes('⋊'))) ||
+                        (!(cluster.affix || cluster.morphemes.includes('⋊')) && !(successor.affix || successor.morphemes.includes('⋉'))) ||
+                        (cluster.site == 'rightMarginal' && !successor.morphemes.includes('⋉')) ||
+                        (cluster.site == 'right' && !(successor.affix || successor.morphemes.includes('⋉')))
+                    ) {
+                        cluster.successors.delete(successor);
+                    }
                 }
             }
+            initial.hasUndergoneCycleDeletion = true;
         }
-        for (var cluster of clusterInfo) {
-            cluster.explanations = new Set;
+
+        if (!initial.explanations) {
+            for (var cluster of clusterInfo) {
+                cluster.explanations = new Set;
+            }
         }
+
         initial.explanations.add('⋊');
+
         for (var cluster of Morphology.topologicalSort(clusterInfo)) {
             if (cluster.disabled) {
+                continue;
+            }
+            if (cluster.intact) {
                 continue;
             }
             for (var predecessor of cluster.predecessors) {
@@ -1336,12 +1385,13 @@ Morphology = {
                 for (var explanation of predecessor.explanations) {
                     for (var morpheme of cluster.morphemes) {
                         morpheme = morpheme.replace(Morphology.subscripts, '');
-                        if (Morphology.searchPrefixTree(validationPrefixTree, explanation + morpheme).length > 0) {
+                        if (Morphology.searchPrefix(explanation + morpheme, validationArray)) {
                             cluster.explanations.add(explanation + morpheme);
                         }
                     }
                 }
             }
+            cluster.intact = true;
         }
         var total = final.numEndingPaths;
         var explained = final.explanations.size;
@@ -1355,10 +1405,29 @@ Morphology = {
         return normalizingFactor * (scoring.precision + scoring.recall + scoring.MDL);
     },
 
-    getInventedWords: (limit, validationPrefixTree, numValidationWords, clusterInfo, initial, final, words) => {
+    searchPrefix: (prefix, array) => {
+        if (prefix.length == 0) {
+            return true;
+        }
+        var [low, high] = [0, array.length - 1];
+        while (low < high) {
+            var mid = Math.floor((low + high) / 2);
+            if (array[mid].startsWith(prefix)) {
+                return true;
+            }
+            if (array[mid] < prefix) {
+                low = mid + 1;
+            } else {
+                high = mid - 1;
+            }
+        }
+        return false;
+    },
+
+    getInventedWords: (limit, validationArray, numValidationWords, clusterInfo, initial, final, words) => {
         var initial = clusterInfo.filter((c) => c.morphemes.includes('⋊'))[0];
         var final = clusterInfo.filter((c) => c.morphemes.includes('⋉'))[0];
-        Morphology.inventWords(validationPrefixTree, numValidationWords, clusterInfo, initial, final, words);
+        Morphology.inventWords(validationArray, numValidationWords, clusterInfo, initial, final, words);
         var result = new Set;
         var invent = function* (q, w, n) {
             if (n == 0 && q.morphemes.includes('⋉')) {
@@ -1376,7 +1445,6 @@ Morphology = {
                 }
             }
         };
-        result = new Set(final.explanations);
         stateCountLoop:
         for (var numStates = 3; true; numStates++) {
             empty = true;
