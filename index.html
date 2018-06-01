@@ -663,8 +663,15 @@
                 reader.readAsText(file);
                 if (file.name.endsWith('.json')) {
                     reader.onloadend = () => {
-                        window.results = JSON.parse(reader.result);
-                        showResults();
+                        var snapshot = JSON.parse(reader.result);
+                        $('#pause, #resume, #segment, #plot').hide();
+                        results.score = snapshot.score;
+                        results.network = snapshot.network;
+                        results.getInventedWords = snapshot.inventedWords;
+                        results.getValidationSet = snapshot.matchedInventedWords;
+                        $('header, section:not(.results-section)').hide();
+                        $('.results-section').show();
+                        drawNetwork();
                     };
                 } else {
                     reader.onloadend = () => run(reader.result);
@@ -706,18 +713,22 @@
                 return false;
             });
 
-            $('.download-results').click(function() {
+            window.download = function () {
                 var element = document.createElement('a');
-                results.getValidationSet = Array.from(results.getValidationSet);
-                var blob = new Blob([JSON.stringify(results)], {type: 'text/plain'});
+                var snapshot = {
+                    score: results.score,
+                    network: results.network,
+                    inventedWords: results.getInventedWords,
+                    matchedInventedWords: results.inventWords.filter(w => results.getValidationSet.has(w)),
+                };
+                var blob = new Blob([JSON.stringify(snapshot)], {type: 'application/json'});
                 element.setAttribute('href', URL.createObjectURL(blob));
-                element.setAttribute('download', 'results-' + (new Date).toISOString().replace(/[^\d]/g, '') + '.json');
+                element.setAttribute('download', 'snapshot-' + (new Date).toISOString().replace(/[^\d]/g, '') + '.json');
                 element.style.display = 'none';
                 document.body.appendChild(element);
                 element.click();
                 document.body.removeChild(element);
-                return false;
-            });
+            };
 
             $('#pause').click(function() {
                 $(this).hide();
@@ -795,6 +806,7 @@
                 <a href="#" data-src="ron_news_2015_100K-sentences.txt">Romanian</a>
                 <a href="#" data-src="rus_news_2010_100K-sentences.txt">Russian</a>
                 <a href="#" data-src="por_wikipedia_2016_100K-sentences.txt">Portuguese</a>
+                <a href="#" data-src="spa_news_2011_100K-sentences.txt">Spanish</a>
                 <a href="#" data-src="swa_wikipedia_2016_100K-sentences.txt">Swahili</a>
                 <a href="#" data-src="swe_news_2007_100K-sentences.txt">Swedish</a>
                 <a href="#" data-src="tur_news_2005_100K-sentences.txt">Turkish</a>
