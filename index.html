@@ -669,6 +669,7 @@
                         results.network = snapshot.network;
                         results.getInventedWords = snapshot.inventedWords;
                         results.getValidationSet = snapshot.matchedInventedWords;
+                        $('.success-rate').text((100 * results.score).toFixed(2));
                         $('header, section:not(.results-section)').hide();
                         $('.results-section').show();
                         drawNetwork();
