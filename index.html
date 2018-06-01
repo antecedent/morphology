@@ -8,7 +8,7 @@
             font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
         }
 
-        #language a {
+        #language a, #snapshot a {
             display: inline-block;
             padding: 10px;
             margin: 10px;
@@ -21,6 +21,14 @@
 
         #language a:hover {
             background: #CEF;
+        }
+
+        #snapshot a {
+            background: #E8DEE5;
+        }
+
+        #snapshot a:hover {
+            background: #FCE;
         }
 
         #time-series {
@@ -652,10 +660,22 @@
                 });
             };
 
-            $('#language a').click(function () {
-                $.get($(this).data('src'), run);
+            $('#language a, #snapshot a').click(function () {
+                $.get($(this).data('src'), $(this).is('#snapshot a') ? restoreSnapshot : run);
                 return false;
             });
+
+            window.restoreSnapshot = (snapshot) => {
+                $('#pause, #resume, #segment, #plot').hide();
+                results.score = snapshot.score;
+                results.network = snapshot.network;
+                results.inventWords = snapshot.inventedWords;
+                results.getValidationSet = new Set(snapshot.matchedInventedWords);
+                $('.success-rate').text((100 * results.score).toFixed(2));
+                $('header, section:not(.results-section)').hide();
+                $('.results-section').show();
+                drawNetwork();
+            };
 
             $('#upload').change(function () {
                 var reader = new FileReader;
@@ -664,15 +684,7 @@
                 if (file.name.endsWith('.json')) {
                     reader.onloadend = () => {
                         var snapshot = JSON.parse(reader.result);
-                        $('#pause, #resume, #segment, #plot').hide();
-                        results.score = snapshot.score;
-                        results.network = snapshot.network;
-                        results.inventWords = snapshot.inventedWords;
-                        results.getValidationSet = new Set(snapshot.matchedInventedWords);
-                        $('.success-rate').text((100 * results.score).toFixed(2));
-                        $('header, section:not(.results-section)').hide();
-                        $('.results-section').show();
-                        drawNetwork();
+                        restoreSnapshot(snapshot);
                     };
                 } else {
                     reader.onloadend = () => run(reader.result);
@@ -790,8 +802,11 @@
                 <p><input id="upload" type="file"></p>
                 <p><em>Notes:</em> The file will not be uploaded anywhere; all processing takes place in the browser. Only plain text files (.txt) are accepted.</p>
             </dd>
-
-            <dt>Use a corpus from the <a href="http://wortschatz.uni-leipzig.de/en/download">Leipzig Corpora Collection</a> (100K sentences each):</dt>
+            <dt>Preview a completed analysis of some of the texts below:</dt>
+            <dd id="snapshot">
+                <a href="#" data-src="snapshots/lithuanian.json">Lithuanian</a>
+            </dd>
+            <dt>Use this device to analyze a text from the <a href="http://wortschatz.uni-leipzig.de/en/download">Leipzig Corpora Collection</a> (100K sentences each):</dt>
             <dd id="language">
                 <a href="#" data-src="eng_news_2016_100K-sentences.txt">English</a>
                 <a href="#" data-src="est_news_2014_100K-sentences.txt">Estonian</a>
