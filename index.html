@@ -667,8 +667,8 @@
                         $('#pause, #resume, #segment, #plot').hide();
                         results.score = snapshot.score;
                         results.network = snapshot.network;
-                        results.getInventedWords = snapshot.inventedWords;
-                        results.getValidationSet = snapshot.matchedInventedWords;
+                        results.inventWords = snapshot.inventedWords;
+                        results.getValidationSet = new Set(snapshot.matchedInventedWords);
                         $('.success-rate').text((100 * results.score).toFixed(2));
                         $('header, section:not(.results-section)').hide();
                         $('.results-section').show();
@@ -719,7 +719,7 @@
                 var snapshot = {
                     score: results.score,
                     network: results.network,
-                    inventedWords: results.getInventedWords,
+                    inventedWords: results.inventWords,
                     matchedInventedWords: results.inventWords.filter(w => results.getValidationSet.has(w)),
                 };
                 var blob = new Blob([JSON.stringify(snapshot)], {type: 'application/json'});
