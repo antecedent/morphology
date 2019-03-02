@@ -9,7 +9,7 @@ Morphology = {
     pruningThreshold: 5000,
     openClassThresholdFactor: 100,
     successorThresholdFactor: 8,
-    commutationAnomalyFactor: 3,
+    commutationAnomalyFactor: 10,
     maxNumPrimaryCommutations: 3000,
     commutations: [],
     precisionMultiplier: 1,
