@@ -425,7 +425,7 @@ Morphology = {
         var relevantMorphemes = Array.from(morphemes);
         var frequencies = {};
         var progress = 0;
-        var beginningOfText = text.slice(0, 100000);
+        var beginningOfText = text.slice(0, 1000000);
         for (var morpheme of relevantMorphemes) {
             progressCallback(progress++, relevantMorphemes.length);
             frequencies[morpheme] = beginningOfText.split(morpheme).length - 1;
