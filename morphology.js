@@ -17,8 +17,8 @@ Morphology = {
     MDLMultiplier: 1,
     numReclusteringIterations: 1,
     MDLUpperBound: 300,
-    maxNumClusters: 5000,
-    maxNumEdges: 5000,
+    maxNumClusters: 3000,
+    maxNumEdges: 3000,
     subscripts: /[₀₁₂₃₄₅₆₇₈₉]/g,
 
     product: function* (iterable, n) {
