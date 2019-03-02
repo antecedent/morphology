@@ -17,7 +17,7 @@ Morphology = {
     MDLMultiplier: 1,
     numReclusteringIterations: 1,
     MDLUpperBound: 300,
-    maxNumClusters: 2000,
+    maxNumClusters: 500,
     maxNumEdges: 5000,
     subscripts: /[₀₁₂₃₄₅₆₇₈₉]/g,
 
