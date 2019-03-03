@@ -174,13 +174,13 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/luminous-lightbox/2.0.0/luminous-basic.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
     <script
       src="https://code.jquery.com/jquery-3.3.1.min.js"
       integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
       crossorigin="anonymous"></script>
-  <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
     <script src="visualization.js"></script>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/luminous-lightbox/2.0.0/Luminous.min.js"></script>
@@ -218,6 +218,69 @@
             window.segmenting = false;
 
             window.segmentationTimeouts = [];
+
+            window.segmentOnDemand = (w) => {
+
+                var info = results.getClusterInfo;
+
+                var allPrefixes = function* (string) {
+                    for (var i = 1; i <= string.length; i++) {
+                        yield string.substring(0, i);
+                    }
+                };
+
+                var segmentWord = (hypotheses, word, state, path, novel, root) => {
+                    if (!state) {
+                        for (var q of info) {
+                            if (!q.boundary && !q.disabled) {
+                                segmentWord(hypotheses, word, q, [], false, false);
+                            }
+                        }
+                        return hypotheses;
+                    }
+                    if (word === '') {
+                        if (state.boundary && root) {
+                            hypotheses.push({novel: novel, path: path});
+                        }
+                        return hypotheses;
+                    }
+                    for (var m of state.morphemes.map(Visualization.removeSubscripts)) {
+                        if (word.startsWith(m)) {
+                            for (var q of state.successors) {
+                                if (root && !q.affix && !q.boundary) {
+                                    continue;
+                                }
+                                if (q.disabled) {
+                                    continue;
+                                }
+                                segmentWord(hypotheses, word.substring(m.length), q, path.concat([m]), novel, root || !q.affix);
+                            }
+                        }
+                    }
+                    if (!novel && !state.affix) {
+                        for (var m of allPrefixes(word)) {
+                            for (var q of state.successors) {
+                                if (!q.disabled && (q.affix || q.boundary)) {
+                                    segmentWord(hypotheses, word.substring(m.length), q, path.concat([m]), true, true);
+                                }
+                            }
+                        }
+                    }
+                    return hypotheses;
+                };
+
+                var hypotheses = segmentWord([], w);
+
+                if (hypotheses.filter((h) => !h.novel).length > 0) {
+                    hypotheses = hypotheses.filter((h) => !h.novel);
+                }
+                hypotheses.sort((l, r) => r.path.length - l.path.length);
+                try {
+                    return hypotheses[0].path.join('-');
+                } catch (error) {
+                    return null;
+                }
+            };
 
             window.segment = (progressCallback, doneCallback) => {
 
@@ -795,7 +858,7 @@
     </header>
     <section class="texts-section">
         <h2>Input</h2>
-        <p><input id="splitting-on" checked type="checkbox"> Mitigate the conflation of homonymous affixes (highly multiplies the number of inital clusters, which triggers pruning)</p>
+        <p style="display: none;"><input id="splitting-on" checked type="checkbox"> Mitigate the conflation of homonymous affixes (highly multiplies the number of inital clusters, which triggers pruning)</p>
         <dl>
             <dt>Open a local file:</dt>
             <dd>
@@ -804,7 +867,7 @@
             </dd>
             <dt>Preview a completed analysis of some of the texts below:</dt>
             <dd id="snapshot">
-                <a href="#" data-src="snapshots/english.json">English</a>                
+                <a href="#" data-src="snapshots/english.json">English</a>
                 <a href="#" data-src="snapshots/lithuanian.json">Lithuanian</a>
             </dd>
             <dt>Use this device to analyze a text from the <a href="http://wortschatz.uni-leipzig.de/en/download">Leipzig Corpora Collection</a> (100K sentences each):</dt>
@@ -828,6 +891,7 @@
                 <a href="#" data-src="swe_news_2007_100K-sentences.txt">Swedish</a>
                 <a href="#" data-src="tur_news_2005_100K-sentences.txt">Turkish</a>
             </dd>
+        </dl>
     </section>
     <section class="parameters-section" style="display: none;">
         <h2>Parameters</h2>
@@ -854,7 +918,7 @@
             </tr>
             <tr>
                 <td>Maximum # of morphemes to consider</td>
-                <td><input data-key="pruningThreshold" type="number" value="5000"></td>
+                <td><input data-key="pruningThreshold" type="number" value="3000"></td>
             </tr>
             <tr style="display: none;">
                 <td>Relative size of training/validation sets</td>

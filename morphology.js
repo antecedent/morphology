@@ -4,12 +4,8 @@ Morphology = {
     preferredMorphemeLength: 3,
     numSalientSubstrings: 3000,
     minCommutationStrength: 30,
-    minEdgeStrength: 1,
-    edgeThresholdFactor: 5,
-    pruningThreshold: 5000,
-    openClassThresholdFactor: 100,
-    successorThresholdFactor: 8,
-    commutationAnomalyFactor: 10,
+    pruningThreshold: 30000,
+    commutationAnomalyFactor: 3,
     maxNumPrimaryCommutations: 3000,
     commutations: [],
     precisionMultiplier: 1,
@@ -17,8 +13,8 @@ Morphology = {
     MDLMultiplier: 1,
     numReclusteringIterations: 1,
     MDLUpperBound: 300,
-    maxNumClusters: 3000,
-    maxNumEdges: 3000,
+    maxNumClusters: 750,
+    maxNumEdges: 1500,
     subscripts: /[₀₁₂₃₄₅₆₇₈₉]/g,
 
     product: function* (iterable, n) {
@@ -31,68 +27,6 @@ Morphology = {
         } else {
             yield [];
         }
-    },
-
-    learnPhonotactics: (words, n) => {
-        // words with boundaries
-        // use n-grams
-        var getNGrams = (n) => {
-            var result = {};
-            var unigrams = {};
-            for (var word of words) {
-                for (var i = 0; i < word.length; i++) {
-                    if (!unigrams.hasOwnProperty(word[i])) {
-                        unigrams[word[i]] = 0;
-                    }
-                    unigrams[word[i]]++;
-                    if (i + n > word.length) {
-                        continue;
-                    }
-                    var nGram = word.substring(i, i + n);
-                    if (!result.hasOwnProperty(nGram)) {
-                        result[nGram] = 0;
-                    }
-                    result[nGram]++;
-                }
-            }
-            var absences = new Set;
-            var unigramFrequencies = Object.values(unigrams);
-            unigramFrequencies.sort((l, r) => r - l);
-            var cutoff = 0;
-            if (unigramFrequencies.length > 100) {
-                cutoff = unigramFrequencies[100];
-            }
-            // Filter out quotations in foreign alphabets
-            var unigrams = Object.keys(unigrams).filter((u) => unigrams[u] > cutoff);
-            for (var nGram of Morphology.product(unigrams, n)) {
-                nGram = nGram.join('');
-                var test = nGram;
-                if (test[0] == '⋊') {
-                    test = test.substring(1);
-                }
-                if (test[test.length - 1] == '⋉') {
-                    test = test.substring(0, test.length - 1);
-                }
-                if (test.match(/[⋊⋉]/) !== null) {
-                    continue;
-                }
-                if (!result.hasOwnProperty(nGram)) {
-                    result[nGram] = 0;
-                    absences.add(nGram);
-                }
-            }
-            return [result, Array.from(absences)];
-        };
-        var result = [];
-        for (var n of [2, 3]) {
-            var [nGrams, absences] = getNGrams(n);
-            result.push({
-                n: n,
-                nGrams: nGrams,
-                absences: absences
-            });
-        }
-        return result;
     },
 
     shuffle: (items) => {
@@ -655,30 +589,30 @@ Morphology = {
             var last = path.length == 0 ? root : path[path.length - 1].cluster;
             if (last.boundary) {
 
-                var spurious = true;
+                // var spurious = true;
                 var relation = path[path.length - 1].relation;
-                if (relation == 'predecessors') {
-                    var prefix = Array.from(path).reverse().slice(1).filter(s => s.cluster.affix).map(s => s.cluster.morphemes[0]).join('');
-                    for (var m of root.morphemes) {
-                        if (Morphology.searchPrefix(prefix + m, dependencies.trainingArray)) {
-                            spurious = false;
-                            break;
-                        }
-                    }
-                }
-                if (relation == 'successors') {
-                    var suffix = Array.from(path).reverse().slice(1).filter(s => s.cluster.affix).map(s => s.cluster.morphemes[0]).join('');
-                    for (var m of root.morphemes) {
-                        if (Morphology.searchPrefix((m + suffix).split('').reverse().join(''), dependencies.reverseTrainingArray)) {
-                            spurious = false;
-                            break;
-                        }
-                    }
-                }
-
-                if (spurious) {
-                    return;
-                }
+                // if (relation == 'predecessors') {
+                //     var prefix = Array.from(path).reverse().slice(1).filter(s => s.cluster.affix).map(s => s.cluster.morphemes[0]).join('');
+                //     for (var m of root.morphemes) {
+                //         if (Morphology.searchPrefix(prefix + m, dependencies.trainingArray)) {
+                //             spurious = false;
+                //             break;
+                //         }
+                //     }
+                // }
+                // if (relation == 'successors') {
+                //     var suffix = Array.from(path).reverse().slice(1).filter(s => s.cluster.affix).map(s => s.cluster.morphemes[0]).join('');
+                //     for (var m of root.morphemes) {
+                //         if (Morphology.searchPrefix((m + suffix).split('').reverse().join(''), dependencies.reverseTrainingArray)) {
+                //             spurious = false;
+                //             break;
+                //         }
+                //     }
+                // }
+                //
+                // if (spurious) {
+                //     return;
+                // }
 
                 if (path.length == 1) {
                     return;
@@ -687,26 +621,53 @@ Morphology = {
                 n++;
                 for (var i = path.length - 2; i >= 0; i--) {
                     var step = path[i];
-                    result.push({
-                        id: id++,
-                        disabled: false,
-                        affix: true,
-                        boundary: false,
-                        site: step.cluster.site,
-                        host: (i == 0) ? rootCopy : null,
-                        morphemes: [step.cluster.morphemes[0] + Morphology.numberToUnicodeSubscript(n)],
-                        successors: new Set((i != path.length - 2 && path[i + 1].relation == 'successors') ? [result[result.length - 1]] : []),
-                        predecessors: new Set((i != path.length - 2 && path[i + 1].relation == 'predecessors') ? [result[result.length - 1]] : []),
-                    });
+
+                    var affix = rootCopy;
+                    for (var j = 0; j <= i; j++) {
+                        var step2 = path[j];
+                        var found = false;
+                        for (var relative of affix[relation]) {
+                            var found = false;
+                            for (var morphemeWithSubscripts of relative.morphemes) {
+                                var morpheme = morphemeWithSubscripts.replace(Morphology.subscripts, '');
+                                if (step2.cluster.morphemes[0] == morpheme) {
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if (found) {
+                                break;
+                            }
+                        }
+                        if (found) {
+                            affix = relative;
+                        } else {
+                            var prevAffix = affix;
+                            affix = {
+                                id: id++,
+                                disabled: false,
+                                affix: true,
+                                boundary: false,
+                                site: step.cluster.site,
+                                host: (i == 0) ? rootCopy : null,
+                                morphemes: [step.cluster.morphemes[0] + Morphology.numberToUnicodeSubscript(n)],
+                                successors: new Set((i != path.length - 2 && path[i + 1].relation == 'predecessors') ? [prevAffix] : []),
+                                predecessors: new Set((i != path.length - 2 && path[i + 1].relation == 'successors') ? [prevAffix] : []),
+                            };
+                            prevAffix[relation].add(affix);
+                            result.push(affix);
+                            break;
+                        }
+                    }
                     if (i == path.length - 2) {
                         if (path[path.length - 1].cluster.morphemes.includes('⋊')) {
-                            result[result.length - 1].predecessors.add(initial);
+                            affix.predecessors.add(initial);
                         } else {
-                            result[result.length - 1].successors.add(final);
+                            affix.successors.add(final);
                         }
                     }
                 }
-                rootCopy[path[0].relation].add(result[result.length - 1]);
+                rootCopy[path[0].relation].add(affix);
                 numMorphemes += path.length - 1;
                 return;
             }
