@@ -589,30 +589,30 @@ Morphology = {
             var last = path.length == 0 ? root : path[path.length - 1].cluster;
             if (last.boundary) {
 
-                // var spurious = true;
+                var spurious = true;
                 var relation = path[path.length - 1].relation;
-                // if (relation == 'predecessors') {
-                //     var prefix = Array.from(path).reverse().slice(1).filter(s => s.cluster.affix).map(s => s.cluster.morphemes[0]).join('');
-                //     for (var m of root.morphemes) {
-                //         if (Morphology.searchPrefix(prefix + m, dependencies.trainingArray)) {
-                //             spurious = false;
-                //             break;
-                //         }
-                //     }
-                // }
-                // if (relation == 'successors') {
-                //     var suffix = Array.from(path).reverse().slice(1).filter(s => s.cluster.affix).map(s => s.cluster.morphemes[0]).join('');
-                //     for (var m of root.morphemes) {
-                //         if (Morphology.searchPrefix((m + suffix).split('').reverse().join(''), dependencies.reverseTrainingArray)) {
-                //             spurious = false;
-                //             break;
-                //         }
-                //     }
-                // }
-                //
-                // if (spurious) {
-                //     return;
-                // }
+                if (relation == 'predecessors') {
+                    var prefix = Array.from(path).reverse().slice(1).filter(s => s.cluster.affix).map(s => s.cluster.morphemes[0]).join('');
+                    for (var m of root.morphemes) {
+                        if (Morphology.searchPrefix(prefix + m, dependencies.trainingArray)) {
+                            spurious = false;
+                            break;
+                        }
+                    }
+                }
+                if (relation == 'successors') {
+                    var suffix = Array.from(path).reverse().slice(1).reverse().filter(s => s.cluster.affix).map(s => s.cluster.morphemes[0]).join('');
+                    for (var m of root.morphemes) {
+                        if (Morphology.searchPrefix((m + suffix).split('').reverse().join(''), dependencies.reverseTrainingArray)) {
+                            spurious = false;
+                            break;
+                        }
+                    }
+                }
+
+                if (spurious) {
+                    return;
+                }
 
                 if (path.length == 1) {
                     return;
