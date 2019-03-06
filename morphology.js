@@ -49,7 +49,7 @@ Morphology = {
 
     extractWords: (text) => {
         var words = new Set;
-        for (var word of text.toLowerCase().split(/[\s\d:]+/u)) {
+        for (var word of text.toLowerCase().split(/[\s\d:—\-]+/u)) {
             word = word.replace(Morphology.leadingPunctuation, '');
             word = word.replace(Morphology.trailingPunctuation, '');
             words.add(word);

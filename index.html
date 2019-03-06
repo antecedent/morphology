@@ -170,6 +170,43 @@
             color: #39c;
         }
 
+        #segmentation-dialog {
+            text-align: center;
+        }
+
+        #segmentation-input {
+            margin: 0 auto;
+            width: 450px;
+            height: 125px;
+            display: block;
+            border: 1px solid lightgray;
+            padding: 2px;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        #segmentation-output {
+            margin: 0 auto;
+            width: 450px;
+            height: 125px;
+            display: none;
+            text-align: left;
+            border: 1px solid lightgray;
+            padding: 2px;
+        }
+
+        #segmentation-button {
+            margin: 10px auto;
+        }
+
+        .word {
+            display: inline-block;
+            padding-right: 6px;
+        }
+
+        .word.segmented {
+            background: #e6ffcc;
+        }
+
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/luminous-lightbox/2.0.0/luminous-basic.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css">
@@ -219,142 +256,94 @@
 
             window.segmentationTimeouts = [];
 
-            window.segmentOnDemand = (w) => {
+            window.segment = (word) => {
 
-                var info = results.getClusterInfo;
-
-                var allPrefixes = function* (string) {
-                    for (var i = 1; i <= string.length; i++) {
-                        yield string.substring(0, i);
-                    }
-                };
-
-                var segmentWord = (hypotheses, word, state, path, novel, root) => {
-                    if (!state) {
-                        for (var q of info) {
-                            if (!q.boundary && !q.disabled) {
-                                segmentWord(hypotheses, word, q, [], false, false);
-                            }
-                        }
-                        return hypotheses;
-                    }
-                    if (word === '') {
-                        if (state.boundary && root) {
-                            hypotheses.push({novel: novel, path: path});
-                        }
-                        return hypotheses;
-                    }
-                    for (var m of state.morphemes.map(Visualization.removeSubscripts)) {
-                        if (word.startsWith(m)) {
-                            for (var q of state.successors) {
-                                if (root && !q.affix && !q.boundary) {
-                                    continue;
-                                }
-                                if (q.disabled) {
-                                    continue;
-                                }
-                                segmentWord(hypotheses, word.substring(m.length), q, path.concat([m]), novel, root || !q.affix);
-                            }
-                        }
-                    }
-                    if (!novel && !state.affix) {
-                        for (var m of allPrefixes(word)) {
-                            for (var q of state.successors) {
-                                if (!q.disabled && (q.affix || q.boundary)) {
-                                    segmentWord(hypotheses, word.substring(m.length), q, path.concat([m]), true, true);
-                                }
-                            }
-                        }
-                    }
-                    return hypotheses;
-                };
-
-                var hypotheses = segmentWord([], w);
-
-                if (hypotheses.filter((h) => !h.novel).length > 0) {
-                    hypotheses = hypotheses.filter((h) => !h.novel);
-                }
-                hypotheses.sort((l, r) => r.path.length - l.path.length);
-                try {
-                    return hypotheses[0].path.join('-');
-                } catch (error) {
-                    return null;
-                }
-            };
-
-            window.segment = (progressCallback, doneCallback) => {
-
-                if (segmenting) {
-                    return;
-                }
-
-                segmenting = true;
-
-                var _text = window.text;
                 var info = results.getClusterInfo;
                 var trainingWords = results.extractWords;
                 var validationWords = results.getValidationSet;
 
-                var progress = 0;
-                var total = trainingWords.size + validationWords.size;
-
                 var allPrefixes = function* (string) {
                     for (var i = 1; i <= string.length; i++) {
                         yield string.substring(0, i);
                     }
                 };
 
-                var segmentWord = (hypotheses, word, state, path, novel, root) => {
-                    if (!state) {
-                        for (var q of info) {
-                            if (!q.boundary && !q.disabled) {
-                                segmentWord(hypotheses, word, q, [], false, false);
-                            }
-                        }
-                        return hypotheses;
+                var similarity = (w1, w2) => {
+                    if (w1 == w2) {
+                        return w1.length;
                     }
-                    if (word === '') {
-                        if (state.boundary && root) {
-                            hypotheses.push({novel: novel, path: path});
-                        }
-                        return hypotheses;
-                    }
-                    for (var m of state.morphemes.map(Visualization.removeSubscripts)) {
-                        if (word.startsWith(m)) {
-                            for (var q of state.successors) {
-                                if (root && !q.affix && !q.boundary) {
-                                    continue;
-                                }
-                                if (q.disabled) {
-                                    continue;
-                                }
-                                segmentWord(hypotheses, word.substring(m.length), q, path.concat([m]), novel, root || !q.affix);
-                            }
+                    var result = 0;
+                    for (var i = 1; i < w1.length + 1; i++) {
+                        if (w2.startsWith(w1.substring(0, i))) {
+                            result += 1;
                         }
                     }
-                    if (!novel && !state.affix) {
-                        for (var m of allPrefixes(word)) {
-                            for (var q of state.successors) {
-                                if (!q.disabled && (q.affix || q.boundary)) {
-                                    segmentWord(hypotheses, word.substring(m.length), q, path.concat([m]), true, true);
-                                }
-                            }
+                    for (var i = 0; i < w1.length - 1; i++) {
+                        if (w2.endsWith(w1.substring(i))) {
+                            result += 1;
                         }
                     }
-                    return hypotheses;
+                    return result;
                 };
 
-                var deploySegmentation = (word, hypotheses) => {
+                var trace = (pieces, cluster) => {
+                    if (pieces[0] == '⋉') {
+                        return 0;
+                    }
+                    for (var m of cluster.morphemes) {
+                        var best = 0;
+                        var sim = similarity(pieces[0], m);
+                        for (var s of cluster.successors) {
+                            var score = sim - 0.5 + trace(pieces.slice(1), s);
+                            if (score > best) {
+                                best = score;
+                            }
+                        }
+                        return best;
+                    }
+                    return 0;
+                };
+
+                var segmentWord = (word) => {
+                    var bestScore = 0;
+                    var bestHypothesis = word;
+
+                    var hypotheses = [word[0]];
+                    for (var i = 1; i < word.length; i++) {
+                        var letter = word[i];
+                        var length = hypotheses.length;
+                        for (var j = 0; j < length; j++) {
+                            var h = hypotheses[j];
+                            hypotheses.push(h + letter);
+                            hypotheses.push(h + '-' + letter);
+                        }
+                        hypotheses = hypotheses.slice(length);
+                    }
+                    for (var h of hypotheses) {
+                        var pieces = ('⋊-' + h + '-⋉').split('-');
+                        var score = trace(pieces, info.filter((c) => c.morphemes.includes('⋊'))[0]);
+                        //console.log(h, score);
+                        if (score > bestScore) {
+                            bestScore = score;
+                            bestHypothesis = h;
+                        }
+                    }
+
+                    return bestHypothesis;
+                };
+
+                var deploySegmentation = (word, hypothesis) => {
                     var escapedWord = word.replace(/[.?*+^$[\]\\(){}|-]/g, "\\$&");
-                    if (hypotheses.filter((h) => !h.novel).length > 0) {
-                        hypotheses = hypotheses.filter((h) => !h.novel);
-                    }
-                    hypotheses.sort((l, r) => r.path.length - l.path.length);
-                    try {
-                        var segmentation = hypotheses[0].path.join('-');
-                    } catch (error) {
-                        debugger;
-                    }
+                    // if (hypotheses.filter((h) => !h.novel).length > 0) {
+                    //     hypotheses = hypotheses.filter((h) => !h.novel);
+                    // }
+                    // hypotheses.sort((l, r) => r.path.length - l.path.length);
+                    // try {
+                    //     var segmentation = hypotheses[0].path.join('-');
+                    // } catch (error) {
+                    //     debugger;
+                    // }
+                    var segmentation = hypothesis;
                     console.log(word, segmentation);
                     var variations = [
                         [escapedWord.toLowerCase(), segmentation.toLowerCase()],
@@ -366,47 +355,7 @@
                     }
                 };
 
-                for (var word of trainingWords) {
-                    if (!segmenting) {
-                        break;
-                    }
-                    if (word === '') {
-                        continue;
-                    }
-                    segmentationTimeouts.push(setTimeout(function (word) {
-                        if (!segmenting) {
-                            return;
-                        }
-                        progressCallback(progress++, total);
-                        deploySegmentation(word, segmentWord([], word));
-                        if (progress + 1 == total) {
-                            segmenting = false;
-                            segmentationTimeouts = [];
-                            doneCallback(_text);
-                        }
-                    }, 1, word));
-                }
-
-                for (var word of validationWords) {
-                    if (!segmenting) {
-                        break;
-                    }
-                    if (word === '') {
-                        continue;
-                    }
-                    segmentationTimeouts.push(setTimeout(function (word) {
-                        if (!segmenting) {
-                            return;
-                        }
-                        progressCallback(progress++, total);
-                        deploySegmentation(word, segmentWord([], word));
-                        if (progress + 1 == total) {
-                            segmenting = false;
-                            segmentationTimeouts = [];
-                            doneCallback(_text);
-                        }
-                    }, 1, word));
-                }
+                return segmentWord(word);
             };
 
             window.drawNetwork = () => {
@@ -760,37 +709,27 @@
             });
 
             $('#segment').click(function() {
-                if (segmenting) {
-                    return false;
-                }
                 $('#pause').trigger('click');
-                $('#segmentation-dialog').dialog({width: 500, height: 100, beforeClose: function () {
-                    for (var timeout of segmentationTimeouts) {
-                        clearTimeout(timeout);
+                $('#segmentation-input').val('').show();
+                $('#segmentation-output').val('').hide();
+                $('#segmentation-button').prop('disabled', false).click(function() {
+                    $('#segmentation-button').prop('disabled', true);
+                    var words = $('#segmentation-input').hide().val().toLowerCase().split(/\s+/);
+                    var output = '';
+                    for (var word of words) {
+                        word = word.replace(/^[!"#$%&\'()*+,-./:;<=>?@\[\\\]\^_`{|}~—‘’„“”¿¡«»-]*/, '');
+                        word = word.replace(/[!"#$%&\'()*+,-./:;<=>?@\[\\\]\^_`{|}~—‘’„“”¿¡«»-]*$/, '');
+                        output += '<span class="word">' + word + '</span>';
+                        $('#segmentation-output').html(output).show();
                     }
-                    segmentationTimeouts = [];
-                    segmenting = false;
-                    $('#resume').trigger('click');
-                }});
-                $('#segmentation-download-button').hide();
-                $('#segmentation-progress-bar').progressbar({value: 0}).show();
-                window.setTimeout(function () {
-                    var segmentation = segment((progress, total) => $('#segmentation-progress-bar').progressbar({value: Math.floor(100 * progress / total)}), function (segmentation) {
-                        $('#segmentation-progress-bar').hide();
-                        $('#segmentation-download-button').click(function () {
-                            var element = document.createElement('a');
-                            var blob = new Blob([segmentation], {type: 'text/plain'});
-                            element.setAttribute('href', URL.createObjectURL(blob));
-                            element.setAttribute('download', 'segmented-input-' + (new Date).toISOString().replace(/[^\d]/g, '') + '.txt');
-                            element.style.display = 'none';
-                            document.body.appendChild(element);
-                            element.click();
-                            document.body.removeChild(element);
-                            $('#resume').trigger('click');
-                            return false;
-                        }).show();
-                    });
-                }, 100);
+                    var t = 0;
+                    for (var word of $('#segmentation-output .word')) {
+                        window.setTimeout(function(word) {
+                            $(word).html(segment($(word).html())).addClass('segmented');
+                        }, t++ * 10, word);
+                    }
+                });
+                $('#segmentation-dialog').dialog({width: 500, height: 300});
                 return false;
             });
 
@@ -863,7 +802,10 @@
                     }
                 }
             }
+
+
         });
+
     </script>
 </head>
 <body>
@@ -1018,9 +960,11 @@
     </div>
     <div id="invention-dialog" style="display: none;" title="Word predictions">
     </div>
-    <div id="segmentation-dialog" style="display: none;" title="Segmenting the input...">
-        <button id="segmentation-download-button">Download (.txt)</button>
-        <div id="segmentation-progress-bar"></div>
+    <div id="segmentation-dialog" style="display: none;" title="Segmentation">
+        <p style="text-align: center;">Please provide some text to segment:</p>
+        <textarea id="segmentation-input"></textarea>
+        <div id="segmentation-output"></div>
+        <button id="segmentation-button">Segment</button>
     </div>
 </body>
 </html>
