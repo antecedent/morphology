@@ -192,6 +192,7 @@
             text-align: left;
             border: 1px solid lightgray;
             padding: 2px;
+            overflow: auto;
         }
 
         #segmentation-button {
@@ -256,6 +257,27 @@
 
             window.segmentationTimeouts = [];
 
+            window.similarity = (w1, w2) => {
+                if (w1 == w2) {
+                    return w1.length;
+                }
+                if (w1.length > w2.length) {
+                    [w1, w2] = [w2, w1];
+                }
+                var result = 0;
+                for (var i = 1; i < w1.length + 1; i++) {
+                    if (w2.startsWith(w1.substring(0, i))) {
+                        result += 1;
+                    }
+                }
+                for (var i = 0; i < w1.length - 1; i++) {
+                    if (w2.endsWith(w1.substring(i))) {
+                        result += 1;
+                    }
+                }
+                return result;
+            };
+
             window.segment = (word) => {
 
                 var info = results.getClusterInfo;
@@ -268,40 +290,23 @@
                     }
                 };
 
-                var similarity = (w1, w2) => {
-                    if (w1 == w2) {
-                        return w1.length;
-                    }
-                    var result = 0;
-                    for (var i = 1; i < w1.length + 1; i++) {
-                        if (w2.startsWith(w1.substring(0, i))) {
-                            result += 1;
-                        }
-                    }
-                    for (var i = 0; i < w1.length - 1; i++) {
-                        if (w2.endsWith(w1.substring(i))) {
-                            result += 1;
-                        }
-                    }
-                    return result;
-                };
-
                 var trace = (pieces, cluster) => {
                     if (pieces[0] == '⋉') {
                         return 0;
                     }
+                    var best = 0;
                     for (var m of cluster.morphemes) {
-                        var best = 0;
-                        var sim = similarity(pieces[0], m);
+                        var sim = similarity(pieces[0], Visualization.removeSubscripts(m));
                         for (var s of cluster.successors) {
                             var score = sim + trace(pieces.slice(1), s);
-                            if (score > best) {
+                            if (score >= best) {
                                 best = score;
                             }
                         }
-                        return best;
+
+                        //console.log(pieces, cluster.morphemes.join(' '), best);
                     }
-                    return 0;
+                    return best;
                 };
 
                 var segmentWord = (word) => {
@@ -344,7 +349,7 @@
                     //     debugger;
                     // }
                     var segmentation = hypothesis;
-                    console.log(word, segmentation);
+                    //console.log(word, segmentation);
                     var variations = [
                         [escapedWord.toLowerCase(), segmentation.toLowerCase()],
                         [escapedWord.toUpperCase(), segmentation.toUpperCase()],
