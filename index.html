@@ -294,7 +294,7 @@
                         var best = 0;
                         var sim = similarity(pieces[0], m);
                         for (var s of cluster.successors) {
-                            var score = sim - 0.5 + trace(pieces.slice(1), s);
+                            var score = sim + trace(pieces.slice(1), s);
                             if (score > best) {
                                 best = score;
                             }
