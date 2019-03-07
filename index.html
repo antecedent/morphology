@@ -298,7 +298,7 @@
                     for (var m of cluster.morphemes) {
                         var sim = 0;
                         if (!cluster.affix) {
-                            sim = pieces[0].length;
+                            sim = pieces[0].length * similarity(pieces[0], Visualization.removeSubscripts(m));
                         } else {
                             sim = (pieces[0] === Visualization.removeSubscripts(m)) ? pieces[0].length : 0;
                         }
