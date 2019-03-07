@@ -331,7 +331,7 @@
                     for (var h of hypotheses) {
                         var pieces = ('⋊-' + h + '-⋉').split('-');
                         var score = trace(pieces, info.filter((c) => c.morphemes.includes('⋊'))[0]);
-                        console.log(h, score);
+                        //console.log(h, score);
                         if (score > bestScore) {
                             bestScore = score;
                             bestHypothesis = h;
