@@ -330,12 +330,16 @@
                     }
                     var best = 123456;
                     for (var m of cluster.morphemes) {
-                        var m1 = pieces[0];
-                        var m2 = Visualization.removeSubscripts(m);
-                        if (m1.length > m2.length) {
-                            [m1, m2] = [m2, m1];
+                        if (cluster.affix) {
+                            var dist = (pieces[0] === Visualization.removeSubscripts(m)) ? 0 : pieces[0].length;
+                        } else {
+                            var m1 = pieces[0];
+                            var m2 = Visualization.removeSubscripts(m);
+                            if (m1.length > m2.length) {
+                                [m1, m2] = [m2, m1];
+                            }
+                            var dist = m2.length - LCS(m1, m2).length;
                         }
-                        var dist = m2.length - LCS(m1, m2).length;
                         for (var s of cluster.successors) {
                             var score = dist + trace(pieces.slice(1), s);
                             if (score <= best) {
