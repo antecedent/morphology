@@ -327,9 +327,12 @@
                 var trace = (pieces, cluster) => {
                     var tooMuch = 123456;
                     if (pieces[0] === '⋉') {
-                        return cluster.boundary ? 0 : tooMuch;
+                        return {score: (cluster.boundary ? 0 : tooMuch), analysis: []};
                     }
-                    var best = tooMuch;
+                    var best = {
+                        score: tooMuch,
+                        analysis: [pieces.slice((pieces[0] === '⋊') ? 1 : 0, pieces.length - 1).join('')]
+                    };
                     for (var m of cluster.morphemes) {
                         if (cluster.affix) {
                             var dist = (pieces[0] === Visualization.removeSubscripts(m)) ? 0 : tooMuch;
@@ -343,9 +346,13 @@
                         }
                         if (dist !== tooMuch) {
                             for (var s of cluster.successors) {
-                                var score = dist + trace(pieces.slice(1), s);
-                                if (score <= best) {
-                                    best = score;
+                                var sub = trace(pieces.slice(1), s);
+                                var score = dist + sub.score;
+                                if (score <= best.score) {
+                                    best = {
+                                        score: score,
+                                        analysis: (m === '⋊' ? [] : [cluster.affix ? m : pieces[0]]).concat(sub.analysis)
+                                    };
                                 }
                             }
                         }
@@ -357,6 +364,7 @@
                 var segmentWord = (word) => {
                     var bestScore = 123456;
                     var bestHypothesis = word;
+                    var bestAnalyses = [[word]];
 
                     var hypotheses = [word[0]];
                     for (var i = 1; i < word.length; i++) {
@@ -365,21 +373,25 @@
                         for (var j = 0; j < length; j++) {
                             var h = hypotheses[j];
                             hypotheses.push(h + letter);
-                            hypotheses.push(h + '-' + letter);
+                            hypotheses.push(h + '·' + letter);
                         }
                         // NOTE the 5
-                        hypotheses = hypotheses.slice(length).filter(hypo => hypo.split('-').length <= 5);
+                        hypotheses = hypotheses.slice(length).filter(hypo => hypo.split('·').length <= 5);
                     }
                     for (var h of hypotheses) {
-                        var pieces = ('⋊-' + h + '-⋉').split('-');
-                        var score = trace(pieces, info.filter((c) => c.morphemes.includes('⋊'))[0]);
+                        var pieces = ('⋊·' + h + '·⋉').split('·');
+                        var evaluation = trace(pieces, info.filter((c) => c.morphemes.includes('⋊'))[0]);
                         //console.log(h, score);
-                        if (score <= bestScore) {
-                            bestScore = score;
+                        if (evaluation.score < bestScore) {
+                            bestScore = evaluation.score;
                             bestHypothesis = h;
+                            bestAnalyses = [evaluation.analysis];
+                        } else if (evaluation.score === bestScore) {
+                            bestHypothesis = h;
+                            bestAnalyses.push(evaluation.analysis);
                         }
                     }
-
+                    console.log(word + '\t' + [...new Set(bestAnalyses.map(a => a.join(' ')))].join(', '));
                     return bestHypothesis;
                 };
 
@@ -777,7 +789,7 @@
                     for (var word of $('#segmentation-output .word')) {
                         window.setTimeout(function(word) {
                             $(word).html(segment($(word).html())).addClass('segmented');
-                        }, t++ * 1000, word);
+                        }, t++ * 2000, word);
                     }
                 });
                 $('#segmentation-dialog').dialog({width: 500, height: 300});
