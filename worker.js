@@ -50,9 +50,8 @@ var initialize = (e) => {
     }
     shouldSplit = e.data.parameters.shouldSplit;
     preliminaryWords = e.data.text.split(/\s+/);
-    //Morphology.trainingSetProportion = Morphology.trainingSetProportion1 / Morphology.trainingSetProportion2;
     // NB the hardcoded value below
-    trainingSetPivot = Math.floor(preliminaryWords.length / 2);
+    trainingSetPivot = Math.min(200000, Math.floor(preliminaryWords.length / 2));
     Morphology.minCommutationStrength = Math.floor(Math.pow(preliminaryWords.length, 1 / 3));
     trainingSet = preliminaryWords.slice(0, trainingSetPivot).join(' ');
     validationSet = preliminaryWords.slice(trainingSetPivot).join(' ');
