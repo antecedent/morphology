@@ -777,7 +777,7 @@
                     for (var word of $('#segmentation-output .word')) {
                         window.setTimeout(function(word) {
                             $(word).html(segment($(word).html())).addClass('segmented');
-                        }, t++ * 10, word);
+                        }, t++ * 1000, word);
                     }
                 });
                 $('#segmentation-dialog').dialog({width: 500, height: 300});
