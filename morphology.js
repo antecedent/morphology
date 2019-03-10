@@ -918,14 +918,13 @@ Morphology = {
             }
             var candidate = Array.from(output);
             if (affixCascade.length == 0) {
-                var first = Math.floor(Math.random() * count);
                 var range = dependencies.roots;
-                if (info[first].site == 'left' || info[first].site == 'leftMarginal') {
-                    range = dependencies.prefixes;
-                } else if (info[first].site == 'right' || info[first].site == 'rightMarginal') {
-                    range = dependencies.suffixes;
-                }
-                var second = range[Math.floor(Math.random() * range.length)];
+                do {
+                    var first = Math.floor(Math.random() * range.length);
+                    var second = Math.floor(Math.random() * range.length);
+                } while (first === second);
+                first = range[first];
+                second = range[second];
             } else {
                 var [first, second] = affixCascade[0];
                 iteration--;

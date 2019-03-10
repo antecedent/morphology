@@ -348,7 +348,7 @@
                             for (var s of cluster.successors) {
                                 var sub = trace(pieces.slice(1), s);
                                 var score = dist + sub.score;
-                                if (score <= best.score) {
+                                if (score < best.score) {
                                     best = {
                                         score: score,
                                         analysis: (m === '⋊' ? [] : [cluster.affix ? m : pieces[0]]).concat(sub.analysis)
@@ -771,27 +771,29 @@
                 }
             });
 
+            $('#segmentation-button').click(function() {
+                $('#segmentation-button').prop('disabled', true);
+                var words = $('#segmentation-input').hide().val().toLowerCase().split(/[\s\d:]+/);
+                var output = '';
+                for (var word of words) {
+                    word = word.replace(/^[!"#$%&\'()*+,-./:;<=>?@\[\\\]\^_`{|}~—‘’„“”¿¡«»-]*/, '');
+                    word = word.replace(/[!"#$%&\'()*+,-./:;<=>?@\[\\\]\^_`{|}~—‘’„“”¿¡«»-]*$/, '');
+                    output += '<span class="word">' + word + '</span>';
+                    $('#segmentation-output').html(output).show();
+                }
+                var t = 0;
+                for (var word of $('#segmentation-output .word')) {
+                    window.setTimeout(function(word) {
+                        $(word).html(segment($(word).html())).addClass('segmented');
+                    }, t++ * 2000, word);
+                }
+            });
+
             $('#segment').click(function() {
                 $('#pause').trigger('click');
                 $('#segmentation-input').val('').show();
                 $('#segmentation-output').val('').hide();
-                $('#segmentation-button').prop('disabled', false).click(function() {
-                    $('#segmentation-button').prop('disabled', true);
-                    var words = $('#segmentation-input').hide().val().toLowerCase().split(/[\s\d:]+/);
-                    var output = '';
-                    for (var word of words) {
-                        word = word.replace(/^[!"#$%&\'()*+,-./:;<=>?@\[\\\]\^_`{|}~—‘’„“”¿¡«»-]*/, '');
-                        word = word.replace(/[!"#$%&\'()*+,-./:;<=>?@\[\\\]\^_`{|}~—‘’„“”¿¡«»-]*$/, '');
-                        output += '<span class="word">' + word + '</span>';
-                        $('#segmentation-output').html(output).show();
-                    }
-                    var t = 0;
-                    for (var word of $('#segmentation-output .word')) {
-                        window.setTimeout(function(word) {
-                            $(word).html(segment($(word).html())).addClass('segmented');
-                        }, t++ * 2000, word);
-                    }
-                });
+                $('#segmentation-button').prop('disabled', false);
                 $('#segmentation-dialog').dialog({width: 500, height: 300});
                 return false;
             });
