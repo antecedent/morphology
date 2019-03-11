@@ -327,11 +327,11 @@
                 var trace = (pieces, cluster) => {
                     var tooMuch = 123456;
                     if (pieces[0] === '⋉') {
-                        return {score: (cluster.boundary ? 0 : tooMuch), analysis: []};
+                        return {score: (cluster.boundary ? 0 : tooMuch), analyses: [[]]};
                     }
                     var best = {
                         score: tooMuch,
-                        analysis: [pieces.slice((pieces[0] === '⋊') ? 1 : 0, pieces.length - 1).join('')]
+                        analyses: [[pieces.slice((pieces[0] === '⋊') ? 1 : 0, pieces.length - 1).join('')]]
                     };
                     for (var m of cluster.morphemes) {
                         if (cluster.affix) {
@@ -351,8 +351,13 @@
                                 if (score < best.score) {
                                     best = {
                                         score: score,
-                                        analysis: (m === '⋊' ? [] : [cluster.affix ? m : pieces[0]]).concat(sub.analysis)
+                                        analyses: []
                                     };
+                                }
+                                if (score === best.score) {
+                                    for (var a of sub.analyses) {
+                                        best.analyses.push((m === '⋊' ? [] : [cluster.affix ? m : pieces[0]]).concat(a))
+                                    }
                                 }
                             }
                         }
@@ -385,10 +390,10 @@
                         if (evaluation.score < bestScore) {
                             bestScore = evaluation.score;
                             bestHypothesis = h;
-                            bestAnalyses = [evaluation.analysis];
+                            bestAnalyses = evaluation.analyses;
                         } else if (evaluation.score === bestScore) {
                             bestHypothesis = h;
-                            bestAnalyses.push(evaluation.analysis);
+                            bestAnalyses = bestAnalyses.concat(evaluation.analyses);
                         }
                     }
                     console.log(word + '\t' + [...new Set(bestAnalyses.map(a => a.join(' ')))].join(', '));
