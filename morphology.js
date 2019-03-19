@@ -8,9 +8,6 @@ Morphology = {
     commutationAnomalyFactor: 3,
     maxNumPrimaryCommutations: 3000,
     commutations: [],
-    precisionMultiplier: 1,
-    recallMultiplier: 1,
-    MDLMultiplier: 1,
     numReclusteringIterations: 1,
     MDLUpperBound: 300,
     maxNumClusters: 750,
@@ -454,7 +451,7 @@ Morphology = {
         var affixes = Array.from(affixes);
 
         var clusterByMorphemeId = [];
-        clusterByMorphemeId.fill(null, 0, Object.values(morphemeMapping).reduce((c1, c2) => Math.max(), 0));
+        clusterByMorphemeId.fill(null, 0, Object.values(morphemeMapping).reduce((c1, c2) => Math.max(c1, c2), 0));
         var morphemeListByCluster = {0: []};
 
         var signatureByCluster = [null];
@@ -895,7 +892,7 @@ Morphology = {
         var equivalent = (c1, c2) => {
             for (var m1 of c1.morphemes) {
                 for (var m2 of c2.morphemes) {
-                    if (m1 != m2 && m1.replace(Morphology.subscripts, '') == m2.replace(Morphology.subcscripts, '')) {
+                    if (m1 != m2 && m1.replace(Morphology.subscripts, '') == m2.replace(Morphology.subscripts, '')) {
                         return true;
                     }
                 }
@@ -1356,13 +1353,11 @@ Morphology = {
         var total = final.numEndingPaths;
         var explained = final.explanations.size;
         var descriptionLength = new Set(clusterInfo.map((c) => c.id)).size;
-        var normalizingFactor = (1 / (Morphology.precisionMultiplier + Morphology.recallMultiplier + Morphology.MDLMultiplier));
         var scoring = {
-            precision: Morphology.precisionMultiplier * explained / total,
-            recall: Morphology.recallMultiplier * explained / numValidationWords,
-            MDL: Morphology.MDLMultiplier * (1 - Math.min(1, descriptionLength / Morphology.MDLUpperBound))
-        }
-        return normalizingFactor * (scoring.precision + scoring.recall + scoring.MDL);
+            precision: explained / total,
+            recall: explained / numValidationWords
+        };
+        return 2 * scoring.precision * scoring.recall / (scoring.precision + scoring.recall);
     },
 
     searchPrefix: (prefix, array) => {
