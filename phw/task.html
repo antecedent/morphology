@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="style.css">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1 dalies pasitikrinimo testas</title>
+</head>
+<body>
+    <h1>1 dalies pasitikrinimo testas</h1>
+    <p>Užduotys:</p>
+    <section id="bubbles">
+        <div class="task-bubble active">1</div>
+        <div class="task-bubble">2</div>
+        <div class="task-bubble">3</div>
+        <div class="task-bubble">4</div>
+        <div class="task-bubble">5</div>
+        <div class="task-bubble">6</div>
+        <div class="task-bubble">7</div>
+        <div class="task-bubble">8</div>
+        <div class="task-bubble">9</div>
+    </section>
+    <p id="feedback"></p>
+    <section class="task active">
+        <pre class="challenge">išjungti_šviesą()<br><span data-gap="edible" class="gap">?</span> tamsu():<br>    įjungti_šviesą()</pre>
+        <p>Užpildykite klaustuku pažymėtus tarpus nutempdami žemiau esančius elementus:</p>
+        <section class="fillers">
+            <code draggable="true">unless</code>
+            <code draggable="true">if</code>
+            <code draggable="true">depending_on</code>
+        </section>
+        <section class="buttons">
+            <a href="#" class="continue button">Tikrinti</a>
+        </section>
+    </section>
+    <section class="task">
+        <p>Programos būsenų schema:</p>
+        <div class="canvas" style="position: relative; width: 600px; height: 150px; display: block; margin: 30px auto;">
+            <div class="challenge" style="border: 1px solid black; top: 35px; left: 35px; height: 100px; width: 341px; line-height: 100px; text-align: center; position: absolute; border-radius:20px;">
+                <div data-gap="loopCA" class="gap" style="line-height: 20px; vertical-align: bottom; margin-bottom: 5px;">?</div>
+            </div>
+            <div class="challenge" style="background: white; border: 1px solid black; height: 70px; width: 70px; line-height: 70px; text-align: center; position: absolute; border-radius: 500px;">
+                <div data-gap="loopA" class="gap" style="line-height: 20px;">?</div>
+            </div>
+            <div style="position: absolute; height: 1px; width: 100px; left: 71px; top: 35px; border-top: 1px solid black;"></div>
+            <div style="position: absolute; height: 1px; width: 16px; left: 157px; top: 31px; border-top: 1px solid black; transform: rotate(30deg);"></div>
+            <div style="position: absolute; height: 1px; width: 16px; left: 157px; top: 39px; border-top: 1px solid black; transform: rotate(-30deg);"></div>
+            <div class="challenge" style="background: white;  border: 1px solid black; left: 171px; height: 70px; width: 70px; line-height: 70px; text-align: center; position: absolute; border-radius: 100px;">
+                <div data-gap="loopB" class="gap" style="line-height: 20px;">?</div>
+            </div>
+            <div style="position: absolute; height: 1px; width: 100px; left: 241px; top: 35px; border-top: 1px solid black;"></div>
+            <div style="position: absolute; height: 1px; width: 16px; left: 327px; top: 31px; border-top: 1px solid black; transform: rotate(30deg);"></div>
+            <div style="position: absolute; height: 1px; width: 16px; left: 327px; top: 39px; border-top: 1px solid black; transform: rotate(-30deg);"></div>
+            <div class="challenge" style="background: white; border: 1px solid black; left: 341px; height: 70px; width: 70px; line-height: 70px; text-align: center; position: absolute; border-radius: 100px;">
+                <div data-gap="loopC" class="gap" style="line-height: 20px;">?</div>
+            </div>
+            <div style="position: absolute; height: 1px; width: 16px; left: 32px; top: 78px; border-top: 1px solid black; transform: rotate(60deg);"></div>
+            <div style="position: absolute; height: 1px; width: 16px; left: 24px; top: 78px; border-top: 1px solid black; transform: rotate(-60deg);"></div>
+            <div style="position: absolute; left: 70px; width: 100px; top: 0; height: 20px;">
+                (visada)
+            </div>
+            <div class="challenge" style="position: absolute; left: 235px; width: 100px; top: 0; height: 20px;">
+                <div data-gap="loopBC" style="line-height: 18px;" class="gap">?</div>
+            </div>
+            <div style="position: absolute; height: 1px; width: 100px; left: 411px; top: 35px; border-top: 1px solid black;"></div>
+            <div style="position: absolute; height: 1px; width: 16px; left: 497px; top: 31px; border-top: 1px solid black; transform: rotate(30deg);"></div>
+            <div style="position: absolute; height: 1px; width: 16px; left: 497px; top: 39px; border-top: 1px solid black; transform: rotate(-30deg);"></div>
+            <div class="challenge" style="background: white; border: 1px solid black; left: 511px; height: 70px; width: 70px; line-height: 70px; text-align: center; position: absolute; border-radius: 100px;">
+                <div data-gap="loopD" class="gap" style="line-height: 20px;">?</div>
+            </div>
+            <div style="position: absolute; left: 411px; width: 100px; top: 0; height: 20px;">turime žaislą</div>
+        </div>
+        <p>Programos kodas:</p>
+        <pre class="challenge"><span class="gap" data-gap="loopCodeKeyword">?</span> turime_šuns_žaislą():<br>    mesti_žaislą_šuniui()<br>    palaukti_s(10)<br>    ieškoti_šuns_žaislo()</pre>
+        <p>Užpildykite klaustuku pažymėtus tarpus nutempdami žemiau esančius elementus:</p>
+        <section class="fillers">
+            <span draggable="true">(visada)</span>
+            <span draggable="true">(baigta)</span>
+            <span draggable="true">mesti žaislą šuniui</span>
+            <span draggable="true">palaukti 10 s</span>
+            <span draggable="true">ieškoti šuns žaislo</span>
+            <span draggable="true">neturime žaislo</span>
+            <code draggable="true">if</code>
+            <code draggable="true">while</code>
+            <code draggable="true">as long as</code>
+        </section>
+        <section class="buttons">
+            <a href="#" class="continue button">Tikrinti</a>
+        </section>
+    </section>
+    <section class="task">
+        <p>Toliau nepadaryta</p>
+    </section>
+    <script src="behavior.js" charset="utf-8"></script>
+</body>
+</html>

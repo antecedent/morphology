@@ -1,0 +1,168 @@
+* {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 16px;
+    text-align: center;
+    padding-bottom: 30px;
+}
+
+pre {
+    font-family: monospace;
+    line-height: 24px;
+    text-align: left;
+}
+
+.gap {
+    border-radius: 3px;
+    display: inline-block;
+    padding: 0 6px;
+    color: #168;
+    border: 2px dashed #168;
+}
+
+pre.challenge {
+    border: 1px solid lightgray;
+    padding: 10px;
+    margin: 30px auto;
+    display: inline-block;
+    border-radius: 5px;
+}
+
+.challenge .filler {
+    margin: 0;
+    padding: 0 6px;
+}
+
+.fillers > *, .filler {
+    border-radius: 3px;
+    display: inline-block;
+    padding: 3px 6px;
+    margin: 5px;
+    background: #168;
+    color: white;
+    border: 2px dotted white;
+
+}
+
+
+.button {
+    text-decoration: none;
+    display: inline-block;
+    margin-top: 10px;
+    padding: 10px 20px;
+    margin-right: 15px;
+    background: teal;
+    box-shadow: 0 3px 6px lightgray;
+    border: none;
+    letter-spacing: 1px;
+    font-size: 16px;
+    color: white;
+    text-transform: uppercase;
+    border-radius: 5px;
+    transition: background 0.5s, box-shadow 0.5s;
+    outline: none !important;
+}
+
+.buttons {
+    margin-top: 30px;
+}
+
+.button {
+    margin-right: 0;
+}
+
+.button:hover:not(.disabled) {
+    box-shadow: 0 3px 9px #099;
+    transition: box-shadow 0.5s;
+}
+
+.button:focus:not(.disabled) {
+    background: radial-gradient(circle at 75% 75%, #099 0%, #099 60%, teal 65%);
+}
+
+.button.disabled {
+    background: lightgray;
+}
+
+p {
+    margin: 10px;
+}
+
+.task {
+    display: none;
+}
+
+.task-bubble {
+    display: inline-block;
+    border-radius: 30px;
+    height: 30px;
+    width: 30px;
+    text-align: center;
+    border: 2px solid lightgray;
+    line-height: 30px;
+    background: #EEE;
+    vertical-align: middle;
+}
+
+.task-bubble.active {
+    border-color: teal;
+}
+
+.task-bubble.completed {
+    background: #CF9;
+    border-color: #9C6;
+    animation-name: completion;
+    animation-duration: 1s;
+    animation-timing-function: ease;
+}
+
+#bubbles {
+    height: 50px;
+    vertical-align: middle;
+    line-height: 50px;
+}
+
+@keyframes completion {
+    0% {
+        background: #EEE;
+    }
+
+    50% {
+        width: 50px;
+        height: 50px;
+        line-height: 50px;
+    }
+}
+
+.task.active {
+    display: block;
+}
+
+#feedback {
+    display: none;
+    border-radius: 10px;
+    margin: 10px 30px;
+    margin-top: 30px;
+    padding: 10px;
+    transition: 1s ease;
+}
+
+#feedback.positive {
+    display: block;
+    background: #CF9;
+}
+
+#feedback.negative {
+    display: block;
+    background: #FC9;
+}
+
+h1 {
+    margin: 10px;
+    margin-top: 20px;
+    font-size: 24px;
+}
